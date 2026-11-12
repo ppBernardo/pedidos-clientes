@@ -1,0 +1,55 @@
+:root {
+  --cor-fundo: #f5f7fb;
+  --cor-superficie: #ffffff;
+  --cor-borda: #dfe4ee;
+  --cor-texto: #1b2333;
+  --cor-texto-suave: #5b6578;
+  --cor-primaria: #1f5eff;
+  --cor-primaria-escura: #1747c4;
+  --cor-erro: #c62828;
+  --cor-erro-fundo: #fdecec;
+  --cor-sucesso: #1b7f4a;
+  --cor-sucesso-fundo: #e7f6ee;
+  --raio: 10px;
+  --sombra: 0 1px 2px rgb(16 24 40 / 6%), 0 4px 12px rgb(16 24 40 / 6%);
+
+  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--cor-texto);
+  background: var(--cor-fundo);
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.container {
+  width: min(1100px, 100% - 32px);
+  margin-inline: auto;
+}
+
+.topo {
+  background: var(--cor-superficie);
+  border-bottom: 1px solid var(--cor-borda);
+  margin-bottom: 24px;
+}
+
+.topo__conteudo {
+  display: flex;
+  align-items: center;
+  min-height: 60px;
+}
+
+.topo__marca {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
