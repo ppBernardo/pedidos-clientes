@@ -1,0 +1,176 @@
+# Plano de implementação: Pedidos de Clientes
+
+| | |
+|---|---|
+| **Spec** | [docs/spec.md](spec.md) (v1.0) |
+| **Gerado em** | 2026-11-12, Claude Code em *plan mode* (Claude Opus 5.5) |
+| **Status** | Aprovado; desvios registrados no fim do documento |
+
+## Como este plano foi produzido
+
+1. **Spec primeiro.** O rascunho v0.1 de `docs/spec.md` foi escrito e commitado antes de qualquer código.
+2. **Plan mode.** Com o Claude em modo somente leitura:
+   - versões atuais checadas direto no npm e no NuGet. Isso revelou que o .NET 11 e o TypeScript 7 tinham acabado de sair e que o template oficial do Vite trocou ESLint por oxlint;
+   - formatos exatos de hooks, skills, rules e `.mcp.json` confirmados na documentação do Claude Code, por um subagente especializado (`claude-code-guide`).
+3. **Revisão crítica independente.** Um subagente de planejamento recebeu os requisitos e as decisões provisórias e devolveu uma crítica sem partir das conclusões do primeiro rascunho. A seção 2 mostra o que foi aceito e o que foi recusado.
+4. **Perguntas ao humano** nos pontos que eram decisão dele: versão do .NET, framework do frontend, diferenciais e conta do GitHub (seção 1).
+5. **Aprovação** do plano final. Os ajustes que ele trouxe para a spec viraram a v1.0.
+
+## 1. Decisões do revisor humano
+
+| Tema | Opções apresentadas | Decisão | Motivo / consequência |
+|---|---|---|---|
+| Versão do .NET | .NET 8 (já instalado) ou .NET 10 | **.NET 10 LTS** | O .NET 8 saiu de suporte em 10/11/2026; o .NET 11 é STS. Exige instalar o SDK 10 na máquina de desenvolvimento. |
+| Docker | Instalar agora ou seguir sem | **Instalar** | Sem Docker não há SQL Server, testes de integração nem compose para validar. |
+| Frontend | React ou Angular | **React + TypeScript** | Mais enxuto para duas telas. Segue o template oficial do Vite (TS 7 + oxlint). |
+| Diferenciais | Playwright, CI, painel de top clientes, deploy | **Só o CI** | O CA-15 (criar no modal e ver na listagem) virou verificação manual. Saíram o painel e o deploy. |
+| Conta do GitHub | — | **ppBernardo**, pedida no meio do planejamento | O Credential Manager tinha duas contas. O Claude confirmou o ID do e-mail noreply pela API pública antes de configurar. O remote leva o usuário na URL para o push não usar a conta errada. |
+
+## 2. Revisão crítica do rascunho
+
+**Aceito, e o plano mudou por causa disso**:
+
+| Ponto levantado | Ajuste |
+|---|---|
+| Pedido de exemplo com data futura (31/12/2026) ficaria **acima** dos pedidos novos na listagem | Carga com datas fixas até 31/10/2026; fronteiras só nos testes e na Parte 4 |
+| `datetime2(0)` **arredonda**: 23:59:59.6 vira o dia seguinte e o 201 diverge do que foi gravado | `DataPedido` truncada em segundos no domínio, com `TimeProvider` |
+| `EnableRetryOnFailure` lança exceção com transação manual | Proibido no CLAUDE.md |
+| `npx` no `.mcp.json` precisa de `cmd /c` no Windows e quebra no Mac/Linux | DBHub como serviço HTTP do compose (profile `dev`) |
+| O "read-only" do DBHub no SQL Server é só um classificador de palavras-chave | A barreira real é o login `mcp_leitura`, com permissões mínimas |
+| Leituras bloqueando atrás das transações de pedido | RCSI ligado de forma idempotente |
+| Baixa de estoque: snapshot rastreado ficaria obsoleto; produto desativado depois do snapshot | Snapshot `AsNoTracking`; predicado `Ativo = 1 AND Estoque >= @q`; baixa em ordem de `ProdutoId` *antes* do INSERT do pedido |
+| 4 projetos: o risco de exagero está *dentro* deles | Travas no CLAUDE.md: sem MediatR/AutoMapper, repositório genérico, barramento CQRS ou biblioteca de Result |
+| `db_datawriter` é amplo demais | `SELECT` no schema + `INSERT` em 2 tabelas + `UPDATE (Estoque)`. Os testes rodam a API com esse login. |
+| "Dados únicos por teste" não sustenta listagem sem filtro nem ranking global | Um container por assembly, reset das 4 tabelas por teste, o mesmo `init-db.sh` do compose |
+| Hook com `npx` e matcher só `Bash` | Forma exec com `node`; trava de git cobre `Bash\|PowerShell` + `permissions.deny` |
+| `dataFim=9999-12-31` e `pagina` enorme dão 500 por estouro | Faixas validadas (datas 2000–2100, página ≤ 1.000.000) |
+| Parte 4: collation CI funde "ANA SOUZA" e "Ana Souza "; LEFT JOIN não é a causa da lentidão; variável local muda o plano | Diagnóstico corrigido; medição em 3 estados (A/B/C) com literais |
+| Async suffix como warning + warnings como erro quebraria os testes xUnit | `.editorconfig` próprio em `backend/tests` |
+
+**Recusado**, e por quê:
+
+| Sugestão | Motivo da recusa |
+|---|---|
+| Mapear a `SqlException 547` (violação do CHECK de estoque) para 422 | Com a baixa condicional esse caminho não existe. Se o CHECK disparar, é bug, e um 500 com log é o sinal certo. |
+| Plano com 78 commits | Granularidade excessiva. O alvo é ~55 commits, cada um compilando e com testes verdes. |
+| Hook de `Stop` rodando os testes a cada resposta | Adiciona latência em toda interação. O build pós-edição e o CI já cobrem isso. |
+
+## 3. Alternativas descartadas
+
+| Decisão | Alternativa | Por que não |
+|---|---|---|
+| Baixa condicional item a item, em ordem de Id | Um único `UPDATE ... FROM OPENJSON(@itens)` | A ordem dos locks passa a depender do plano de execução, com risco de deadlock. Até 100 idas ao banco numa transação é aceitável. |
+| Baixa condicional | `rowversion` + retry | Pior sob disputa: gera 409 falsos e retries. |
+| FluentValidation | Validação nativa do .NET 10 (`AddValidation()`) | Regras como "produto repetido" ficam mais claras e testáveis em validadores próprios. |
+| EF Core sobre o schema dos scripts | Migrations do EF ou Dapper | Os scripts SQL são a fonte da verdade (o desafio pede `database/`). EF dá LINQ seguro nas leituras, e a SQL crítica do relatório fica explícita via `SqlQuery`. |
+| xUnit v3 + AwesomeAssertions + NSubstitute | FluentAssertions 8 / Moq | FluentAssertions 8 virou licença comercial; o Moq teve o episódio SponsorLink. |
+| DBHub via HTTP no compose | `npx` em stdio; MCP oficial da Microsoft | Portabilidade entre sistemas operacionais e versão fixada em imagem; o MCP oficial exige clonar e compilar. |
+| Reset simples das 4 tabelas | Respawn | Com 4 tabelas, um `DELETE` na ordem das FKs é mais simples e não adiciona dependência. |
+
+---
+
+## 4. Plano aprovado
+
+### 4.1 Arquitetura
+
+```
+/
+├─ CLAUDE.md                    regras gerais (< 200 linhas; aponta para docs/spec.md)
+├─ .claude/
+│  ├─ settings.json             hooks + permissões (allow para build e testes; deny para reescrita de histórico)
+│  ├─ hooks/                    verificar-apos-edicao.mjs, bloquear-reescrita-git.mjs (+ testes com node --test)
+│  ├─ rules/                    backend.md, frontend.md, banco.md, testes.md (frontmatter paths:)
+│  ├─ skills/                   novo-endpoint/, analisar-query/
+│  └─ agents/                   revisor.md (revisa o diff contra spec e CLAUDE.md antes do push)
+├─ .mcp.json                    { "sqlserver": { "type": "http", "url": "http://localhost:8090/mcp" } }
+├─ database/                    01-criar-banco, 02-tabelas, 03-indices, 04-seguranca, 05-carga-dados, init-db.sh, mcp/dbhub.toml
+│  └─ perf/                     run-perf.sh, geração de volume (GENERATE_SERIES), cenário, queries original e corrigida
+├─ backend/                     Pedidos.slnx, global.json, Directory.Build.props, Directory.Packages.props, Dockerfile, .dockerignore
+│  ├─ src/                      Pedidos.Domain · Pedidos.Application · Pedidos.Infrastructure · Pedidos.Api
+│  └─ tests/                    Pedidos.UnitTests · Pedidos.IntegrationTests
+├─ frontend/                    Vite + React + TS; Dockerfile (build Node, depois nginx com proxy /api), nginx.conf
+├─ docs/                        spec.md, plan.md, diario-claude.md, parte4/ (.sqlplan antes e depois)
+├─ docker-compose.yml           sqlserver → db-init → backend → frontend (+ mcp-sqlserver no profile dev)
+└─ .github/workflows/ci.yml     backend (build, unitários, integração) · frontend (lint, tsc, build) · compose (smoke)
+```
+
+| Projeto | Conteúdo |
+|---|---|
+| Domain | `Cliente`, `Produto`, `Pedido` (`Criar(...)`, `ValorTotal`), `ItemPedido` (`Subtotal`), `ItemSolicitado`, `Periodo` (`InicioUtc`, `FimExclusivoUtc`), `RegraNegocioException`, `CodigosErro`. Nenhuma dependência externa. |
+| Application | `PedidoService`; validadores FluentValidation; DTOs `*Request`/`*Response`, `PaginaResponse<T>`; portas `I{Cliente,Produto,Pedido}Repository` e `I{Pedido,Relatorio,Catalogo}Consultas`; `TimeProvider`. |
+| Infrastructure | `PedidosDbContext` sobre o schema dos scripts (**sem migrations**); conversor UTC; repositórios; consultas `AsNoTracking` com projeção direto para DTO. O relatório usa `Database.SqlQuery<T>` com a mesma SQL da Parte 4. |
+| Api | Minimal APIs: `PedidoEndpoints`, `RelatorioEndpoints`, `CatalogoEndpoints`; `ValidationFilter<T>` → 400; `IExceptionHandler`: `RegraNegocioException` → 422 com `codigo`; OpenAPI + Swagger UI; `/health`. |
+
+- **Frontend**:
+  - TanStack Query, com a listagem invalidada após criar;
+  - `fetch` tipado que converte ProblemDetails em `ApiError`;
+  - `PedidosPage` (filtros, tabela, paginação) e `NovoPedidoModal` (`<dialog>` nativo);
+  - chamadas sempre para `/api`: proxy do Vite em dev, nginx no Docker.
+- **Docker**:
+  - SQL Server 2022 com o CU fixado, a mesma imagem nos testes;
+  - `db-init` reaproveita a imagem e roda `bash /database/init-db.sh`;
+  - backend em `aspnet:10.0`, com usuário não root e healthcheck via curl;
+  - senhas padrão alfanuméricas e `${VAR:-padrão}`.
+- **Skills**: cada uma é criada logo depois que o código de referência existe e é **usada de fato**:
+  - `novo-endpoint` gera o GET /pedidos e o relatório;
+  - `analisar-query` conduz a Parte 4 pelo MCP.
+
+### 4.2 Parte 4: diagnóstico prévio (a confirmar com planos reais)
+
+| # | Problema | Efeito |
+|---|---|---|
+| 1 | `ORDER BY Total` ascendente | o "ranking" começa por quem comprou menos |
+| 2 | `GROUP BY c.Nome` | funde homônimos e, pela collation CI_AS, variações de caixa e espaço final |
+| 3 | 2º `LEFT JOIN` continua externo | pedido sem itens dá `Total` NULL, que vai para o topo no ASC |
+| 4 | `YEAR(p.DataPedido) = 2026` | não é sargable e força scan |
+| 5 | FK `ItensPedido.PedidoId` sem índice; agregação por `NVARCHAR(150)` | scan + hash join na maior tabela; agregação larga + sort |
+
+Correção:
+- pré-agregar por `ClienteId` num intervalo semiaberto, com INNER JOINs;
+- juntar `Clientes` só no fim;
+- ordenar por `Total DESC, c.Id`.
+
+Evidências:
+- uma massa em `PedidosPerf`, com estados A/B/C;
+- `STATISTICS IO/TIME` e os `.sqlplan` versionados;
+- Query Store e DMVs lidos pelo MCP.
+
+### 4.3 Testes
+
+- **Unitários** (xUnit v3, NSubstitute, AwesomeAssertions):
+  - regras do `Pedido` e limites do `Periodo`;
+  - validadores (CA-04/05/06/12/14);
+  - `PedidoService` (cliente/produto inexistente, inativo, estoque, data truncada, corrida).
+- **Integração** (Testcontainers.MsSql + `WebApplicationFactory`, scripts reais, login da API):
+  - CA-01 a CA-14 e rollback;
+  - concorrência do CA-08 (20 POSTs para estoque 5) e ordem cruzada sem deadlock;
+  - mapeamento EF contra o schema, idempotência do init, acentos e ProblemDetails.
+- **CI**: backend, frontend e smoke do compose.
+
+### 4.4 Execução por marcos
+
+| Marco | Conteúdo | Depende de |
+|---|---|---|
+| M0 | spec v1.0; este plano; diário de uso do Claude | — |
+| M1 | CLAUDE.md; rules; hook que trava reescrita de git (+ teste); permissões | — |
+| M2 | scripts SQL 01–05 + `init-db.sh` | Docker para validar |
+| M3 | solução .NET (global.json, props centrais, 4 projetos + 2 de testes); hook de build pós-edição | SDK 10 |
+| M4 | Domain + testes; Application + testes; CI do backend | SDK 10 |
+| M5 | compose com sqlserver + db-init; MCP (serviço `dev` + `.mcp.json`); pausa para reiniciar a sessão e carregar o MCP | Docker |
+| M6 | EF Core + repositórios; fixture Testcontainers; POST e GET /pedidos/{id}; ProblemDetails; integração (incl. concorrência) | SDK + Docker |
+| M7 | skill `novo-endpoint` → demais endpoints + testes; `/health`; Swagger; subagente `revisor`; API no compose | — |
+| M8 | frontend + nginx no compose; CI do frontend + smoke do compose | — |
+| M9 | Parte 4 com a skill `analisar-query` e o MCP | MCP |
+| M10 | README; rastreabilidade CA → teste; retrospectiva | — |
+
+### 4.5 Verificação
+
+| Marco | Como |
+|---|---|
+| M1 | `node --test .claude/hooks`; `git commit --amend` bloqueado via Bash e via PowerShell |
+| M2/M5 | `docker compose down -v && docker compose up -d sqlserver db-init` duas vezes, sem duplicar dados; login da API sem DDL; login do MCP sem escrita; acentos íntegros; MCP conectado |
+| M3/M4 | build com 0 warnings; erro proposital num `.cs` é devolvido pelo hook; unitários verdes local e no CI |
+| M6/M7 | integração verde; CA-08 repetido sem instabilidade; payloads iguais à spec §5 |
+| M8 | lint, tsc e build verdes; roteiro manual em `localhost:3000` |
+| M9 | massa reproduzível; original × corrigida divergem no cenário; corrigida = endpoint |
+| M10 | clone limpo sem `.env` → `docker compose up` funciona; CI verde |
