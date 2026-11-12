@@ -1,0 +1,49 @@
+# Aplicação completa:            docker compose up --build
+# Banco + MCP para desenvolvimento: docker compose --profile dev up -d sqlserver db-init mcp-sqlserver
+#
+# Todas as variáveis têm padrão de desenvolvimento, então nada precisa de .env.
+# Para mudar, copie .env.example para .env.
+name: pedidos
+
+x-sqlserver-imagem: &sqlserver-imagem mcr.microsoft.com/mssql/server:2022-CU28-ubuntu-22.04
+
+services:
+  sqlserver:
+    image: *sqlserver-imagem
+    platform: linux/amd64 # sem imagem ARM: no Apple Silicon roda emulado
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${SA_PASSWORD:-Pedidos2026Sa}
+    ports:
+      - "${SQL_PORT:-1433}:1433"
+    volumes:
+      - sqlserver-dados:/var/opt/mssql
+    healthcheck:
+      # $$ evita que o compose interpole a variável: quem expande é o shell do container.
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -Q 'SELECT 1' -o /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # Executa database/init-db.sh e termina: banco, tabelas, índices, logins e
+  # carga de exemplo. Idempotente, então roda a cada `up` sem duplicar dados.
+  db-init:
+    image: *sqlserver-imagem # reaproveita a imagem: já traz o sqlcmd
+    platform: linux/amd64
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    entrypoint: ["bash", "/database/init-db.sh"]
+    environment:
+      DB_HOST: sqlserver
+      SA_PASSWORD: ${SA_PASSWORD:-Pedidos2026Sa}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-Pedidos2026App}
+      MCP_DB_PASSWORD: ${MCP_DB_PASSWORD:-Pedidos2026Mcp}
+    volumes:
+      - ./database:/database:ro
+    restart: "no"
+
+volumes:
+  sqlserver-dados:
