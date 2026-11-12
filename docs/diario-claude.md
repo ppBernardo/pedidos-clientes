@@ -88,3 +88,17 @@ Registro cronológico de como o Claude Code foi usado neste projeto: o que funci
 
 - **Skill `novo-endpoint`** escrita a partir do padrão real do `POST /pedidos`, com modelos extraídos do código.
 - **Limitação encontrada**: ao tentar invocar a skill logo depois de criá-la, a resposta foi `Unknown skill`. Skills e subagentes são descobertos quando a sessão começa. Em vez de criar os endpoints restantes "à mão" e dizer que foram feitos com a skill, o Claude escreveu também a skill `analisar-query` e o subagente `revisor` e pediu **um** reinício da sessão para usá-los de verdade.
+
+## 2026-11-12: endpoints com a skill e revisão com o subagente (M7, parte 2)
+
+- **`/novo-endpoint` usada de verdade** depois do reinício, três vezes: `GET /pedidos`, `GET /relatorios/top-clientes` e `GET /clientes` + `GET /produtos`. A skill tem o passo "a spec manda", então antes de cada endpoint o Claude conferiu a seção 5 e os CAs da spec. Os commits citam a skill.
+- **Correção encontrada pelo roteiro da skill.** O smoke test previsto na verificação mostrou o OpenAPI com os parâmetros em PascalCase (`ClienteId`), diferente do contrato. O binding não diferencia maiúsculas, então só a documentação estava errada. A correção foi um transformer do OpenAPI na API, para não pôr atributos de ASP.NET na Application.
+- **Subagente `revisor` antes do push.** Ele revisou o histórico inteiro. **Dois pontos foram conferidos no código e descartados por serem falsos:**
+  - "falta teste de integração do CA-04": o teste existe e cobre os dois corpos;
+  - "senha no `appsettings.json` base": a connection string está só no `appsettings.Development.json`.
+
+  **Dois pontos foram aceitos** e viraram commits `fix:`:
+  - porta do SQL publicada só no loopback;
+  - senhas dos logins passadas ao `sqlcmd` por variável de ambiente, e não por `-v`. O comentário do script prometia isso, mas o código não cumpria.
+
+  A sugestão de voltar para `CollectionBehavior(DisableTestParallelization)` foi recusada: ela não compila no xUnit 4. Lição: o relatório de um agente é uma hipótese, não prova. Cada item foi verificado antes de virar código.
