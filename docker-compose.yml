@@ -1,4 +1,4 @@
-# Aplicação completa:            docker compose up --build
+# Aplicação completa:            docker compose up --build   (front em http://localhost:3000)
 # Banco + MCP para desenvolvimento: docker compose --profile dev up -d sqlserver db-init mcp-sqlserver
 #
 # Todas as variáveis têm padrão de desenvolvimento, então nada precisa de .env.
@@ -44,6 +44,32 @@ services:
     volumes:
       - ./database:/database:ro
     restart: "no"
+
+  # API .NET 10. Conecta com o login de menor privilégio pedidos_app.
+  backend:
+    build: ./backend
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      ConnectionStrings__Pedidos: "Server=sqlserver,1433;Database=PedidosDb;User Id=pedidos_app;Password=${APP_DB_PASSWORD:-Pedidos2026App};TrustServerCertificate=True;Encrypt=True"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  # SPA servida pelo nginx, que também faz o proxy de /api para o backend.
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
 
   # MCP do SQL Server para o Claude Code (DBHub via HTTP, login somente leitura).
   # Só sobe com o profile dev e só escuta no loopback da máquina.
