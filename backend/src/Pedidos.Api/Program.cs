@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Pedidos.Api.Endpoints;
 using Pedidos.Api.ErrorHandling;
+using Pedidos.Api.OpenApi;
 using Pedidos.Application;
 using Pedidos.Infrastructure;
 using Pedidos.Infrastructure.Persistence;
@@ -22,7 +23,7 @@ builder.Services.AddExceptionHandler<RequisicaoInvalidaExceptionHandler>();
 // ProblemDetails. Sem isso, em produção ela devolveria um 400 sem corpo.
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddOperationTransformer<QueryEmCamelCaseTransformer>());
 builder.Services.AddHealthChecks().AddDbContextCheck<PedidosDbContext>("sqlserver");
 
 var app = builder.Build();
