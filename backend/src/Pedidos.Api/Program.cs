@@ -41,5 +41,6 @@ app.UseSwaggerUI(options =>
 app.MapHealthChecks("/health");
 app.MapPedidoEndpoints();
 app.MapRelatorioEndpoints();
+app.MapCatalogoEndpoints();
 
 app.Run();
