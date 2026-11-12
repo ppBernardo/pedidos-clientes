@@ -73,3 +73,18 @@ Registro cronológico de como o Claude Code foi usado neste projeto: o que funci
   3. **Analisador do xUnit (xUnit1051).** Ele recusou `default` como `CancellationToken` nas verificações do NSubstitute. Trocado por `Arg.Any<CancellationToken>()`.
   4. **Teste com falso positivo.** O teste "cliente inexistente" passava pelo motivo errado. O NSubstitute devolve `""`, e não `null`, para `string` não configurada, então o serviço "achava" o cliente. O código de produção estava certo; o teste agora configura o cenário explicitamente.
 - **Resultado:** 55 testes unitários, build com warnings como erro (0 warnings) e CI com o job do backend.
+
+## 2026-11-12: persistência, API e testes de integração (M6)
+
+- **Baixa de estoque** com UPDATE condicional em ordem de `ProdutoId`, antes do INSERT do pedido. Os detalhes vieram da revisão independente do plano.
+- **Smoke test sem banco.** Antes do commit da API, o Claude subiu a API e conferiu o que não depende do banco: OpenAPI 3.1, Swagger, JSON malformado → 400 com `traceId`, e validação → 400 com a chave `itens[1].quantidade`.
+- **Ajuste de desenho pego antes de rodar.** O `Program.cs` lia a connection string antes do `Build()`, e o `WebApplicationFactory` não conseguiria trocá-la. O registro do `DbContext` passou a ler a configuração quando o contexto é criado.
+- **API nova do xUnit 4.** `CollectionBehavior(DisableTestParallelization)` virou erro de compilação. O Claude confirmou a substituta (`Parallelization(Mode = ParallelMode.None)`) lendo o XML de documentação do pacote, em vez de chutar.
+- **Ruído do hook em escrita paralela.** Quando vários arquivos interdependentes são escritos de uma vez, o hook do primeiro arquivo compila antes de os outros existirem e acusa erro transitório. O Claude confere com um build completo antes de agir.
+- **Commit intermediário quebrado.** No commit dos repositórios entrou o `DependencyInjection.cs`, que já registrava as consultas, só commitadas no commit seguinte. Esse commit isolado não compila. **Não** foi reescrito: o histórico é preservado (e o próprio hook bloquearia o amend).
+- **Testes de integração escritos, mas não executados aqui.** A máquina continua sem Docker. Eles compilam e entraram no CI, que roda num runner com Docker.
+
+## 2026-11-12: skills e subagente (M7, parte 1)
+
+- **Skill `novo-endpoint`** escrita a partir do padrão real do `POST /pedidos`, com modelos extraídos do código.
+- **Limitação encontrada**: ao tentar invocar a skill logo depois de criá-la, a resposta foi `Unknown skill`. Skills e subagentes são descobertos quando a sessão começa. Em vez de criar os endpoints restantes "à mão" e dizer que foram feitos com a skill, o Claude escreveu também a skill `analisar-query` e o subagente `revisor` e pediu **um** reinício da sessão para usá-los de verdade.
