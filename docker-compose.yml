@@ -16,7 +16,8 @@ services:
       MSSQL_PID: Developer
       MSSQL_SA_PASSWORD: ${SA_PASSWORD:-Pedidos2026Sa}
     ports:
-      - "${SQL_PORT:-1433}:1433"
+      # Só no loopback: a senha sa de desenvolvimento está versionada.
+      - "127.0.0.1:${SQL_PORT:-1433}:1433"
     volumes:
       - sqlserver-dados:/var/opt/mssql
     healthcheck:
