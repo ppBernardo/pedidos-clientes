@@ -63,3 +63,13 @@ Registro cronológico de como o Claude Code foi usado neste projeto: o que funci
 - **MCP do SQL Server via HTTP.**
   - O DBHub roda como serviço do compose (profile `dev`). O `.mcp.json` não depende do sistema operacional.
   - O `explain_sql` do DBHub usa `EXPLAIN`, que o SQL Server 2022 não tem, então fica a validar. A alternativa já prevista é ler planos do Query Store e das DMVs com `execute_sql`.
+
+## 2026-11-12: solução .NET, domínio e aplicação (M3 e M4)
+
+- **SDK sem admin.** O SDK 10 foi instalado por usuário com o script oficial `dotnet-install`. O hook de build foi corrigido para achar esse SDK quando o `dotnet` do PATH só tem o 8, e para forçar a saída do CLI em inglês. Neste Windows em português, as mensagens localizadas quebravam a detecção.
+- **Correções em código gerado pelo Claude**, cada uma em commit próprio:
+  1. **Runner de testes.** O Claude configurou os projetos de teste para VSTest (`Microsoft.NET.Test.Sdk` + `xunit.runner.visualstudio`), por hábito. O xUnit v3 4.x roda no Microsoft.Testing.Platform, e o SDK 10 recusou. Correção: ativar o novo `dotnet test` no `global.json`. A regra foi registrada no CLAUDE.md para não se repetir.
+  2. **`new(...)` com `params`.** Um `new(0, 1)` com tipo inferido como único argumento de um `params` não compila (CS8752). O **hook pegou o erro na hora**. Mesmo assim o Claude **repetiu o erro** no arquivo seguinte, e o hook pegou de novo. A correção definitiva foi trocar o `params` por *collection expression* (`[new(1, 1)]`).
+  3. **Analisador do xUnit (xUnit1051).** Ele recusou `default` como `CancellationToken` nas verificações do NSubstitute. Trocado por `Arg.Any<CancellationToken>()`.
+  4. **Teste com falso positivo.** O teste "cliente inexistente" passava pelo motivo errado. O NSubstitute devolve `""`, e não `null`, para `string` não configurada, então o serviço "achava" o cliente. O código de produção estava certo; o teste agora configura o cenário explicitamente.
+- **Resultado:** 55 testes unitários, build com warnings como erro (0 warnings) e CI com o job do backend.
