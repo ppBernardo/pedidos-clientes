@@ -9,12 +9,16 @@ namespace Pedidos.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString)
+    /// <param name="connectionString">
+    /// Lida quando o DbContext é criado, e não no startup: assim os testes de
+    /// integração conseguem trocar a configuração pelo WebApplicationFactory.
+    /// </param>
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, Func<IServiceProvider, string> connectionString)
     {
         // Sem EnableRetryOnFailure: ele é incompatível com a transação manual da
         // criação de pedido (o EF lança exceção). O compose só sobe a API depois
         // que o banco está pronto.
-        services.AddDbContext<PedidosDbContext>(options => options.UseSqlServer(connectionString));
+        services.AddDbContext<PedidosDbContext>((provider, options) => options.UseSqlServer(connectionString(provider)));
 
         services.AddScoped<IClienteRepository, ClienteRepository>();
         services.AddScoped<IProdutoRepository, ProdutoRepository>();

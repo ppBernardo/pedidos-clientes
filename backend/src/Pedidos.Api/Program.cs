@@ -7,11 +7,10 @@ using Pedidos.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("Pedidos")
-    ?? throw new InvalidOperationException("Configure a connection string 'Pedidos' (variável ConnectionStrings__Pedidos).");
-
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddInfrastructure(provider =>
+    provider.GetRequiredService<IConfiguration>().GetConnectionString("Pedidos")
+    ?? throw new InvalidOperationException("Configure a connection string 'Pedidos' (variável ConnectionStrings__Pedidos)."));
 
 // Erros sempre em ProblemDetails (RFC 9457), com traceId para correlacionar com o log.
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = contexto =>
