@@ -109,6 +109,21 @@ public sealed class CriarPedidoTests(AmbienteDeTeste ambiente) : TesteDeIntegrac
     }
 
     [Fact]
+    [Trait("CA", "CA-06")]
+    [Trait("RN", "RN-07")]
+    public async Task Post_ProdutoRepetido_Retorna400SemGravarNada()
+    {
+        var cliente = await Banco.CriarClienteAsync();
+        var produto = await Banco.CriarProdutoAsync("Teclado", 100m, estoque: 10);
+
+        var resposta = await Api.CriarPedidoAsync(cliente, Cancelamento, (produto, 1), (produto, 2));
+
+        resposta.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await resposta.LerProblemaAsync(Cancelamento)).Errors.Should().ContainKey("itens");
+        (await Banco.EstoqueAsync(produto)).Should().Be(10);
+    }
+
+    [Fact]
     [Trait("CA", "CA-07")]
     public async Task Post_ProdutoInexistente_Retorna422ProdutoNaoEncontrado()
     {
