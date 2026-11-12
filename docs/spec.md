@@ -261,3 +261,26 @@ Sem datas, ou com `dataInicio > dataFim`, retorna `400`.
 - **Dados de exemplo**: a carga usa datas fixas de jan/2025 a out/2026. Assim, um pedido criado agora sempre aparece no topo da listagem (CA-15) e os exemplos do README são reproduzíveis. Datas de fronteira (31/12 23:59:59, 01/01 00:00) ficam só nos testes e na massa da Parte 4.
 - **Volume de clientes e produtos**: os endpoints de apoio devolvem a lista completa, o que é adequado ao volume da demo. Com milhares de registros, o frontend passaria a usar busca paginada (autocomplete).
 - **Relatório e a query da Parte 4**: o endpoint de top clientes e a query corrigida da Parte 4 seguem os mesmos princípios (agrupamento por Id, intervalo semiaberto, índice de cobertura). A análise está no README.
+
+## 10. Rastreabilidade (critério → teste)
+
+Nos testes, cada critério também aparece como `[Trait("CA", "CA-xx")]`, e a busca por `CA-xx` mostra onde ele é coberto.
+
+| CA | Unitários (`backend/tests/Pedidos.UnitTests`) | Integração (`backend/tests/Pedidos.IntegrationTests`) |
+|---|---|---|
+| CA-01 | `PedidoTests.Criar_ComItensValidos_*`, `PedidoServiceTests.CriarAsync_PedidoValido_*` | `CriarPedidoTests.Post_PedidoValido_*`, `CriarPedidoTests.GetDoLocation_*` |
+| CA-02 | `PedidoServiceTests.CriarAsync_ClienteInexistente_*` | `CriarPedidoTests.Post_ClienteInexistente_*` |
+| CA-03 | `PedidoTests.Criar_ComEstoqueInsuficiente_*`, `PedidoServiceTests.CriarAsync_EstoqueInsuficienteNoSnapshot_*` | `CriarPedidoTests.Post_UmItemSemEstoque_*`, `CriarPedidoTests.Repositorio_QuandoABaixaDeUmItemFalha_*` |
+| CA-04 | `PedidoTests.Criar_SemItens_*`, `CriarPedidoValidatorTests.Validar_ItensAusentes_*` / `ItensVazios_*` | `CriarPedidoTests.Post_SemItens_*` |
+| CA-05 | `PedidoTests.Criar_ComQuantidadeMenorOuIgualAZero_*`, `CriarPedidoValidatorTests.Validar_QuantidadeInvalida_*` | `CriarPedidoTests.Post_QuantidadeZero_*` |
+| CA-06 | `PedidoTests.Criar_ComProdutoRepetido_*`, `CriarPedidoValidatorTests.Validar_ProdutoRepetido_*` | `CriarPedidoTests.Post_ProdutoRepetido_*` |
+| CA-07 | `PedidoTests.Criar_ComProdutosInexistentes_*` / `ComProdutoInativo_*`, `PedidoServiceTests.CriarAsync_ProdutoInexistente_*` | `CriarPedidoTests.Post_ProdutoInexistente_*` / `Post_ProdutoInativo_*` |
+| CA-08 | — | `ConcorrenciaTests.Post_VinteRequisicoesSimultaneas_*`, `ConcorrenciaTests.Post_PedidosSimultaneosComOsMesmosProdutosEmOrdemCruzada_*` |
+| CA-09 | — | `ListarPedidosTests.Get_SemFiltros_*`, `ListarPedidosTests.Get_PedidosNoMesmoInstante_*` |
+| CA-10 | — | `ListarPedidosTests.Get_FiltrandoPorCliente_*`, `ListarPedidosTests.Get_ClienteSemPedidos_*` |
+| CA-11 | `PeriodoTests.Contem_*` | `ListarPedidosTests.Get_FiltrandoPorPeriodo_*` |
+| CA-12 | `ListarPedidosValidatorTests.*` | `ListarPedidosTests.Get_ParametroInvalido_*`, `Get_PaginaAlemDaUltima_*`, `Get_ParametroQueNaoEhNumero_*` |
+| CA-13 | — | `TopClientesTests.Get_DevolveOsCincoMaiores_*`, `Get_ClientesHomonimos_*`, `Get_IgnoraPedidosForaDoPeriodo_*` |
+| CA-14 | `TopClientesValidatorTests.Validar_SemPeriodo_*` | `TopClientesTests.Get_PeriodoAusenteOuInvertido_*` |
+| CA-15 | — | Roteiro manual no README |
+| CA-16 | — | Job `compose` do CI (`.github/workflows/ci.yml`) |
