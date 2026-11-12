@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Rascunho, em revisão junto com o plano |
-| **Versão** | 0.1 (2026-11-12) |
+| **Status** | Aprovada (revisada junto com o plano em plan mode) |
+| **Versão** | 1.0 (2026-11-12) |
 | **Plano** | [docs/plan.md](plan.md) |
 
 ## 1. Objetivo
@@ -21,7 +21,7 @@ A solução tem banco SQL Server, API .NET e frontend web, e sobe inteira com `d
 - Consultar um pedido por id (é o destino do header `Location` do POST).
 - Relatório dos 5 clientes de maior valor comprado no período.
 - Endpoints de apoio ao frontend: listar clientes e produtos ativos.
-- Frontend: listagem com filtros, modal de criação e painel do relatório.
+- Frontend: listagem com filtros e modal de criação.
 - Scripts SQL de criação e carga, e ambiente Docker completo.
 
 **Fora do escopo (decisão consciente)**
@@ -112,9 +112,9 @@ O valor total do pedido **não é armazenado**: a fonte da verdade são os itens
 | RN-08 | O **estoque** de cada produto deve ser **≥ quantidade** pedida. | 422 `ESTOQUE_INSUFICIENTE` |
 | RN-09 | A criação é **atômica**: pedido, itens e baixa de estoque são gravados numa única transação; qualquer falha desfaz tudo. Com requisições concorrentes o estoque **nunca fica negativo**: a baixa é condicional (`UPDATE ... WHERE Estoque >= @quantidade`) e o `CHECK` do banco é a última barreira. | 422 `ESTOQUE_INSUFICIENTE` |
 | RN-10 | O **preço unitário** do item é o preço do produto no momento da criação. O cliente da API **não envia preço**. Valor total = `Σ quantidade × preço unitário`. | — |
-| RN-11 | A **data do pedido** é o instante da criação em UTC, definido pelo servidor. Filtros de período recebem **datas** (`yyyy-MM-dd`) em UTC, **inclusivas nas duas pontas**, aplicadas como intervalo semiaberto `[dataInicio 00:00, dataFim + 1 dia 00:00)`. | — |
+| RN-11 | A **data do pedido** é o instante da criação em UTC, definido pelo servidor e **truncado em segundos**, porque a coluna `datetime2(0)` arredondaria e 23:59:59.6 viraria o dia seguinte. Filtros de período recebem **datas** (`yyyy-MM-dd`) em UTC entre 2000-01-01 e 2100-12-31, **inclusivas nas duas pontas**, aplicadas como intervalo semiaberto `[dataInicio 00:00, dataFim + 1 dia 00:00)`. | 400 (data fora da faixa) |
 | RN-12 | Na listagem, os filtros são opcionais; se ambos forem informados, `dataInicio ≤ dataFim`. Filtrar por um cliente inexistente retorna lista vazia (não é erro). | 400 |
-| RN-13 | A listagem é ordenada por `DataPedido` desc e depois `Id` desc. Paginação: `pagina ≥ 1` (padrão 1), `tamanhoPagina` entre 1 e 100 (padrão 10). | 400 |
+| RN-13 | A listagem é ordenada por `DataPedido` desc e depois `Id` desc. Paginação: `pagina` entre 1 e 1.000.000 (padrão 1), `tamanhoPagina` entre 1 e 100 (padrão 10). Os limites evitam estouro no cálculo do `OFFSET`. | 400 |
 | RN-14 | **Top clientes**: o período é obrigatório. O ranking soma os itens dos pedidos do período **agrupando por cliente (Id, nunca por nome)**, ordena por valor desc com desempate por `ClienteId` asc e retorna até 5. Cliente sem pedido no período não aparece. | 400 |
 
 Ordem de validação: primeiro o **formato** (400: RN-01, 02, 06, 07), depois as **regras que dependem do banco** (422: RN-03, 04, 05, 08). Em 422 a resposta traz um `codigo` estável para o cliente da API tratar.
@@ -224,17 +224,15 @@ Sem datas, ou com `dataInicio > dataFim`, retorna `400`.
 - Validação na tela (cliente obrigatório, ao menos 1 item, quantidade ≥ 1). Erros da API (400/422) aparecem no modal com a mensagem do `detail`.
 - No sucesso o modal fecha, a listagem é recarregada e aparece a confirmação "Pedido #N criado".
 
-**Painel Top clientes** (extra): período e tabela com o ranking do endpoint 5.4.
-
 ## 7. Requisitos não funcionais
 
 | Id | Requisito |
 |---|---|
 | RNF-01 | `docker compose up` sobe banco (com scripts de criação e carga), API e frontend **sem nenhum passo manual**. A ordem de subida é garantida por healthchecks. |
-| RNF-02 | Consultas com predicados *sargable*, paginação no banco (`OFFSET/FETCH`) e índices de suporte (seção 3). |
-| RNF-03 | Credenciais via variáveis de ambiente, com padrões de desenvolvimento no compose. A API usa um login com **privilégio mínimo** (leitura e escrita, sem DDL), e o MCP do Claude usa um login **somente leitura**. |
-| RNF-04 | Testes unitários (regras e validações), de integração contra **SQL Server real** (Testcontainers, rodando os mesmos scripts de `database/`) e E2E com Playwright. |
-| RNF-05 | Pipeline de CI (GitHub Actions) com build e testes a cada push e pull request. |
+| RNF-02 | Consultas com predicados *sargable*, paginação no banco (`OFFSET/FETCH`) e índices de suporte (seção 3). O banco usa **RCSI** (`READ_COMMITTED_SNAPSHOT`), para leituras não bloquearem atrás de transações de pedido. |
+| RNF-03 | Credenciais via variáveis de ambiente, com padrões de desenvolvimento no compose. A API usa um login com **privilégio mínimo granular**: `SELECT` no schema, `INSERT` em Pedidos e ItensPedido e `UPDATE` só da coluna `Estoque`. O MCP do Claude usa um login **somente leitura** e roda como serviço HTTP do compose (profile `dev`), exposto apenas em `127.0.0.1`. |
+| RNF-04 | Testes unitários (regras e validações) e testes de integração contra **SQL Server real** (Testcontainers, rodando o mesmo `database/init-db.sh` do compose, com a API conectada pelo login de privilégio mínimo). |
+| RNF-05 | Pipeline de CI (GitHub Actions) a cada push e pull request: build, testes unitários, testes de integração, lint e build do frontend, e um *smoke test* do `docker compose`. |
 
 ## 8. Critérios de aceite
 
@@ -254,11 +252,12 @@ Sem datas, ou com `dataInicio > dataFim`, retorna `400`.
 | CA-12 | Quando `dataInicio > dataFim`, `pagina < 1` ou `tamanhoPagina` fora de 1–100, recebo `400`. | Unitário + Integração |
 | CA-13 | Quando peço o top clientes de um período, recebo até 5 clientes em ordem decrescente de valor; pedidos fora do período são ignorados e **clientes homônimos aparecem separados**. | Integração |
 | CA-14 | Quando peço o top clientes sem período, recebo `400`. | Integração |
-| CA-15 | Pelo frontend, quando crio um pedido no modal, ele aparece no topo da listagem. | E2E |
-| CA-16 | Em uma máquina só com Docker, `docker compose up` deixa o frontend acessível em `http://localhost:3000` com dados de exemplo. | Manual + CI |
+| CA-15 | Pelo frontend, quando crio um pedido no modal, ele aparece no topo da listagem. | Manual (roteiro no README) |
+| CA-16 | Em uma máquina só com Docker, `docker compose up` deixa o frontend acessível em `http://localhost:3000` com dados de exemplo. | Manual + CI (smoke do compose) |
 
 ## 9. Premissas e questões em aberto
 
 - **Fuso horário**: datas são gravadas e filtradas em UTC. Para uma operação real num único fuso (ex.: `America/Sao_Paulo`), o próximo passo seria converter os limites do período a partir do fuso de negócio. Isso foi registrado como limitação conhecida.
+- **Dados de exemplo**: a carga usa datas fixas de jan/2025 a out/2026. Assim, um pedido criado agora sempre aparece no topo da listagem (CA-15) e os exemplos do README são reproduzíveis. Datas de fronteira (31/12 23:59:59, 01/01 00:00) ficam só nos testes e na massa da Parte 4.
 - **Volume de clientes e produtos**: os endpoints de apoio devolvem a lista completa, o que é adequado ao volume da demo. Com milhares de registros, o frontend passaria a usar busca paginada (autocomplete).
 - **Relatório e a query da Parte 4**: o endpoint de top clientes e a query corrigida da Parte 4 seguem os mesmos princípios (agrupamento por Id, intervalo semiaberto, índice de cobertura). A análise está no README.
