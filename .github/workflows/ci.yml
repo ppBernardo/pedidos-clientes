@@ -25,7 +25,7 @@ jobs:
         run: node --test ".claude/hooks/**/*.test.mjs"
 
   backend:
-    name: Backend (build e testes unitários)
+    name: Backend (build, testes unitários e de integração)
     runs-on: ubuntu-latest
     env:
       DOTNET_NOLOGO: "1"
@@ -62,3 +62,45 @@ jobs:
         run: npm run lint
       - name: Typecheck e build
         run: npm run build
+
+  # Prova o requisito "sobe com um único comando" numa máquina limpa: sem .env,
+  # sem passo manual. Depois faz um fluxo real pelo proxy do frontend.
+  compose:
+    name: Docker compose (smoke test)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v7
+      - name: docker compose up
+        run: docker compose up -d --build
+      - name: Espera a API responder pelo proxy do frontend
+        run: |
+          for tentativa in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:3000/api/health; then
+              echo "Aplicação no ar."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "A aplicação não subiu a tempo."
+          exit 1
+      - name: Fluxo de ponta a ponta (listar, criar, ver no topo, relatório)
+        run: |
+          set -euo pipefail
+          base=http://localhost:3000
+          curl -fsS -o /dev/null "$base/"
+          test "$(curl -fsS "$base/api/pedidos?tamanhoPagina=1" | jq '.totalItens')" -eq 1500
+          criado=$(curl -fsS -X POST "$base/api/pedidos" -H 'Content-Type: application/json' \
+            -d '{"clienteId": 1, "itens": [{"produtoId": 3, "quantidade": 1}]}')
+          id=$(echo "$criado" | jq '.id')
+          curl -fsS "$base/api/pedidos?tamanhoPagina=1" | jq -e ".itens[0].id == $id"
+          curl -fsS "$base/api/relatorios/top-clientes?dataInicio=2026-01-01&dataFim=2026-12-31" | jq -e 'length == 5'
+          status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/api/pedidos" \
+            -H 'Content-Type: application/json' -d '{"clienteId": 1, "itens": [{"produtoId": 24, "quantidade": 1}]}')
+          test "$status" -eq 422
+      - name: Logs dos containers
+        if: failure()
+        run: docker compose ps --all && docker compose logs
+      - name: Derruba o ambiente
+        if: always()
+        run: docker compose down -v
