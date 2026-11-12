@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Time.Testing;
 
 namespace Pedidos.IntegrationTests.Infra;
 
@@ -11,7 +10,7 @@ public sealed class PedidosApiFactory(string connectionStringApp) : WebApplicati
 {
     public static readonly DateTimeOffset Agora = new(2026, 11, 12, 15, 30, 45, TimeSpan.Zero);
 
-    public FakeTimeProvider Relogio { get; } = new(Agora);
+    public RelogioDeTeste Relogio { get; } = new(Agora);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

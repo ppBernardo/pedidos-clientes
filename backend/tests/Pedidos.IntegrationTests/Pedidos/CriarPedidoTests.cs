@@ -42,7 +42,7 @@ public sealed class CriarPedidoTests(AmbienteDeTeste ambiente) : TesteDeIntegrac
     {
         var cliente = await Banco.CriarClienteAsync();
         var produto = await Banco.CriarProdutoAsync("Monitor", 1000m, estoque: 5);
-        Ambiente.Api.Relogio.SetUtcNow(new DateTimeOffset(2026, 12, 31, 23, 59, 59, 900, TimeSpan.Zero));
+        Ambiente.Api.Relogio.Agora = new DateTimeOffset(2026, 12, 31, 23, 59, 59, 900, TimeSpan.Zero);
 
         var criado = await Api.CriarPedidoAsync(cliente, Cancelamento, (produto, 1));
         var json = await Api.GetStringAsync(criado.Headers.Location, Cancelamento);

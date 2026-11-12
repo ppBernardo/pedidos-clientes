@@ -11,7 +11,7 @@ public abstract class TesteDeIntegracao(AmbienteDeTeste ambiente) : IAsyncLifeti
     public virtual async ValueTask InitializeAsync()
     {
         await Banco.LimparAsync();
-        Ambiente.Api.Relogio.SetUtcNow(PedidosApiFactory.Agora);
+        Ambiente.Api.Relogio.Agora = PedidosApiFactory.Agora;
         Api = Ambiente.Api.CreateClient();
     }
 
