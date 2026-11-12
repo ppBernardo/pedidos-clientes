@@ -8,9 +8,9 @@
 import { spawnSync } from 'node:child_process';
 import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
-import { classificar, ehErroDeArquivoTravado, resumirErros } from './lib/verificacao.mjs';
+import { candidatosDotnet, classificar, ehErroDeArquivoTravado, ehSdkAusente, resumirErros } from './lib/verificacao.mjs';
 
 if (process.env.PEDIDOS_HOOK_VERIFICACAO === '0') process.exit(0);
 
@@ -53,16 +53,24 @@ async function comLock(fn) {
   }
 }
 
+// Saída do dotnet em inglês: em Windows em português as mensagens viriam
+// traduzidas e a detecção de "SDK ausente" e "arquivo travado" falharia.
+const ambiente = { ...process.env, DOTNET_CLI_UI_LANGUAGE: 'en', DOTNET_NOLOGO: '1' };
+
 function rodar(comando, args, cwd) {
-  const r = spawnSync(comando, args, { cwd, encoding: 'utf8', timeout: 170_000, windowsHide: true });
+  const r = spawnSync(comando, args, { cwd, env: ambiente, encoding: 'utf8', timeout: 170_000, windowsHide: true });
   return { ok: r.status === 0, saida: `${r.stdout ?? ''}\n${r.stderr ?? ''}`, erro: r.error };
 }
 
 function verificarDotnet(alvo) {
-  const r = rodar('dotnet', ['build', alvo, '--nologo', '-v', 'q', '-clp:NoSummary;ErrorsOnly', '-nodeReuse:false'], raiz);
-  if (r.erro) return null; // SDK ausente: não bloqueia o trabalho
-  if (r.ok || ehErroDeArquivoTravado(r.saida)) return null;
-  return `dotnet build falhou em ${path.relative(raiz, alvo)}:\n${resumirErros(r.saida)}`;
+  for (const dotnet of candidatosDotnet(process.platform, process.env, homedir())) {
+    if (path.isAbsolute(dotnet) && !existsSync(dotnet)) continue;
+    const r = rodar(dotnet, ['build', alvo, '--nologo', '-v', 'q', '-clp:NoSummary;ErrorsOnly', '-nodeReuse:false'], raiz);
+    if (r.erro || ehSdkAusente(r.saida)) continue; // tenta o próximo dotnet
+    if (r.ok || ehErroDeArquivoTravado(r.saida)) return null;
+    return `dotnet build falhou em ${path.relative(raiz, alvo)}:\n${resumirErros(r.saida)}`;
+  }
+  return null; // nenhum dotnet com o SDK certo: não bloqueia o trabalho
 }
 
 function verificarFrontend(arquivo) {

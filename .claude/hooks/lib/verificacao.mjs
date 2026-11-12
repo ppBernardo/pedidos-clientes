@@ -50,6 +50,25 @@ export function ehErroDeArquivoTravado(saida) {
   return /MSB3027|MSB3021|being used by another process|está sendo usado por outro processo/i.test(saida);
 }
 
+/** Este `dotnet` não tem o SDK exigido pelo global.json (ou não conhece net10.0). */
+export function ehSdkAusente(saida) {
+  return /compatible \.NET SDK was not found|No \.NET SDKs were found|compatible installed \.NET SDK|Requested SDK version|NETSDK1045/i.test(
+    saida,
+  );
+}
+
+/**
+ * `dotnet` a tentar, em ordem: o do PATH e, se ele não tiver o SDK certo, a
+ * instalação por usuário padrão do script oficial dotnet-install.
+ */
+export function candidatosDotnet(plataforma, ambiente, home) {
+  const porUsuario =
+    plataforma === 'win32'
+      ? path.join(ambiente.LOCALAPPDATA ?? path.join(home, 'AppData', 'Local'), 'Microsoft', 'dotnet', 'dotnet.exe')
+      : path.join(home, '.dotnet', 'dotnet');
+  return ['dotnet', porUsuario];
+}
+
 /** Mantém só as linhas de erro e limita o tamanho, para não inundar o contexto. */
 export function resumirErros(saida, maxLinhas = 40) {
   const linhas = saida

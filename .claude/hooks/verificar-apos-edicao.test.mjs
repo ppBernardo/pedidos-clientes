@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { classificar, ehErroDeArquivoTravado, resumirErros } from './lib/verificacao.mjs';
+import { candidatosDotnet, classificar, ehErroDeArquivoTravado, ehSdkAusente, resumirErros } from './lib/verificacao.mjs';
 
 function criarProjetoFalso() {
   const raiz = mkdtempSync(path.join(tmpdir(), 'pedidos-hook-'));
@@ -52,6 +52,20 @@ test('arquivo fora do projeto é ignorado', () => {
 test('erro de arquivo travado não é tratado como erro de código', () => {
   assert.ok(ehErroDeArquivoTravado('error MSB3027: Could not copy "obj/x.dll" to "bin/x.dll".'));
   assert.ok(!ehErroDeArquivoTravado("error CS1002: ; expected"));
+});
+
+test('SDK ausente é reconhecido e não confundido com erro de código', () => {
+  assert.ok(ehSdkAusente('A compatible .NET SDK was not found. Requested SDK version: 10.0.100'));
+  assert.ok(ehSdkAusente('error NETSDK1045: The current .NET SDK does not support targeting .NET 10.0.'));
+  assert.ok(!ehSdkAusente("Program.cs(3,1): error CS1002: ; expected"));
+});
+
+test('tenta o dotnet do PATH e depois a instalação por usuário do dotnet-install', () => {
+  assert.deepEqual(candidatosDotnet('win32', { LOCALAPPDATA: 'C:\\Users\\dev\\AppData\\Local' }, 'C:\\Users\\dev'), [
+    'dotnet',
+    path.join('C:\\Users\\dev\\AppData\\Local', 'Microsoft', 'dotnet', 'dotnet.exe'),
+  ]);
+  assert.deepEqual(candidatosDotnet('linux', {}, '/home/dev'), ['dotnet', path.join('/home/dev', '.dotnet', 'dotnet')]);
 });
 
 test('resumo mantém só as linhas de erro, sem repetição', () => {
