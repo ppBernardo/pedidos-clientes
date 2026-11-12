@@ -1,5 +1,7 @@
 # Pedidos de Clientes
 
+[![CI](https://github.com/ppBernardo/pedidos-clientes/actions/workflows/ci.yml/badge.svg)](https://github.com/ppBernardo/pedidos-clientes/actions/workflows/ci.yml)
+
 Cadastro e consulta de pedidos: **SQL Server 2022 + API .NET 10 + React 19**, tudo subindo com um único `docker compose up`. O projeto foi feito com **Claude Code** em fluxo spec-driven (SDD), e a configuração do Claude está versionada no repositório: rules, hooks, skills, subagente e MCP.
 
 | Documento | Conteúdo |
