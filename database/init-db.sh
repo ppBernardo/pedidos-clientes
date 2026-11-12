@@ -25,8 +25,12 @@ if [[ -z "$SQLCMD" ]]; then
   exit 1
 fi
 
-# Senha por variável de ambiente, para não aparecer na lista de processos.
+# Senhas só por variável de ambiente, nunca na linha de comando (que aparece na
+# lista de processos): o sqlcmd lê SQLCMDPASSWORD para o login e resolve as
+# variáveis $(DB_NAME), $(APP_DB_PASSWORD) e $(MCP_DB_PASSWORD) dos scripts a
+# partir do ambiente.
 export SQLCMDPASSWORD="$SA_PASSWORD"
+export DB_NAME APP_DB_PASSWORD MCP_DB_PASSWORD
 
 # -C: confia no certificado autoassinado (o ODBC 18 criptografa por padrão)
 # -b: falha no primeiro erro, para a API não subir sobre um banco quebrado
@@ -52,10 +56,10 @@ executar() {
   sql -d "$banco" -i "$DIR/$arquivo" "$@"
 }
 
-executar master     01-criar-banco.sql -v DB_NAME="$DB_NAME"
+executar master     01-criar-banco.sql
 executar "$DB_NAME" 02-tabelas.sql
 executar "$DB_NAME" 03-indices.sql
-executar "$DB_NAME" 04-seguranca.sql -v DB_NAME="$DB_NAME" APP_DB_PASSWORD="$APP_DB_PASSWORD" MCP_DB_PASSWORD="$MCP_DB_PASSWORD"
+executar "$DB_NAME" 04-seguranca.sql
 
 if [[ "$CARGA_EXEMPLO" == "1" ]]; then
   executar "$DB_NAME" 05-carga-dados.sql
