@@ -1,0 +1,5 @@
+# Nos testes, o nome descreve o cenário (Metodo_Cenario_Resultado) e os
+# métodos async não levam o sufixo Async.
+[*.cs]
+dotnet_naming_rule.async_methods_suffix.severity = none
+dotnet_diagnostic.CA1707.severity = none
