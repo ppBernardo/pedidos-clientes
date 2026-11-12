@@ -1,3 +1,5 @@
+import { PedidosPage } from './pages/PedidosPage.tsx'
+
 export function App() {
   return (
     <>
@@ -7,7 +9,7 @@ export function App() {
         </div>
       </header>
       <main className="container">
-        <p>Em construção.</p>
+        <PedidosPage />
       </main>
     </>
   )
