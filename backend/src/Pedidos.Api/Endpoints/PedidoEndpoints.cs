@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Pedidos.Api.Validation;
 using Pedidos.Application.Abstractions;
+using Pedidos.Application.Comum;
 using Pedidos.Application.Pedidos;
 
 namespace Pedidos.Api.Endpoints;
@@ -22,6 +23,12 @@ public static class PedidoEndpoints
             .WithName("ObterPedido")
             .WithSummary("Detalhe de um pedido (spec 5.2)");
 
+        grupo.MapGet("/", ListarAsync)
+            .AddEndpointFilter<ValidationFilter<ListarPedidosQuery>>()
+            .WithName("ListarPedidos")
+            .WithSummary("Lista pedidos com filtros opcionais por cliente e período, paginada (spec 5.3)")
+            .ProducesValidationProblem();
+
         return app;
     }
 
@@ -37,4 +44,8 @@ public static class PedidoEndpoints
         await consultas.ObterDetalheAsync(id, cancellationToken) is { } pedido
             ? TypedResults.Ok(pedido)
             : TypedResults.NotFound();
+
+    private static async Task<Ok<PaginaResponse<PedidoResumoResponse>>> ListarAsync(
+        [AsParameters] ListarPedidosQuery query, IPedidoConsultas consultas, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await consultas.ListarAsync(query, cancellationToken));
 }
