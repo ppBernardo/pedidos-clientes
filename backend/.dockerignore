@@ -1,0 +1,10 @@
+# Sem isto, o obj/ gerado no Windows (project.assets.json com caminhos C:\)
+# entraria no build Linux e quebraria o restore.
+**/bin/
+**/obj/
+**/TestResults/
+tests/
+.vs/
+*.user
+Dockerfile
+.dockerignore
