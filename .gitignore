@@ -1,0 +1,40 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+.vs/
+TestResults/
+*.trx
+coverage/
+coverage.*.xml
+
+# Node / frontend
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# Ambiente (segredos locais)
+.env
+.env.*
+!.env.example
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# SO
+Thumbs.db
+.DS_Store
+
+# Claude Code: configurações pessoais (as do projeto ficam em .claude/settings.json)
+.claude/settings.local.json

@@ -1,0 +1,12 @@
+# Normaliza finais de linha: LF no repositório e na cópia de trabalho.
+# Importante porque scripts .sh e .sql rodam dentro de containers Linux.
+* text=auto eol=lf
+
+*.sln  text eol=crlf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
