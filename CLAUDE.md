@@ -32,7 +32,7 @@ docs/      spec.md, plan.md, diario-claude.md, parte4/
 | Testes de integração (precisam de Docker) | `dotnet test backend/tests/Pedidos.IntegrationTests` |
 | API local (banco do compose) | `dotnet run --project backend/src/Pedidos.Api` |
 | Frontend | `npm ci --prefix frontend`, depois `npm run dev --prefix frontend` (lint: `npm run lint --prefix frontend`) |
-| Testes dos hooks | `node --test .claude/hooks` |
+| Testes dos hooks | `node --test ".claude/hooks/**/*.test.mjs"` |
 
 ## Arquitetura do backend
 
