@@ -39,6 +39,10 @@ jobs:
         run: dotnet build backend/Pedidos.slnx -c Release
       - name: Testes unitários
         run: dotnet test --project backend/tests/Pedidos.UnitTests -c Release --no-build
+      # O runner ubuntu-latest já tem Docker: o Testcontainers sobe o SQL Server
+      # e roda os mesmos scripts de database/ que o docker compose.
+      - name: Testes de integração (SQL Server real via Testcontainers)
+        run: dotnet test --project backend/tests/Pedidos.IntegrationTests -c Release --no-build
 
   frontend:
     name: Frontend (lint, typecheck e build)
