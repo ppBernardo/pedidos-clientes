@@ -45,5 +45,21 @@ services:
       - ./database:/database:ro
     restart: "no"
 
+  # MCP do SQL Server para o Claude Code (DBHub via HTTP, login somente leitura).
+  # Só sobe com o profile dev e só escuta no loopback da máquina.
+  mcp-sqlserver:
+    image: bytebase/dbhub:1.6.0
+    profiles: ["dev"]
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    command: ["--transport", "http", "--port", "8080", "--config", "/config/dbhub.toml"]
+    environment:
+      MCP_DB_PASSWORD: ${MCP_DB_PASSWORD:-Pedidos2026Mcp}
+    volumes:
+      - ./database/mcp/dbhub.toml:/config/dbhub.toml:ro
+    ports:
+      - "127.0.0.1:8090:8080"
+
 volumes:
   sqlserver-dados:

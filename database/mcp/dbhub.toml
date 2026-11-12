@@ -1,0 +1,28 @@
+# DBHub: servidor MCP que conecta o Claude Code ao SQL Server do compose.
+# Sobe com: docker compose --profile dev up -d mcp-sqlserver
+#
+# Somente leitura em duas camadas:
+#   1. `readonly = true` abaixo. No SQL Server, o DBHub só classifica o texto do
+#      comando, sem garantia do motor; serve de primeira barreira.
+#   2. O login mcp_leitura (database/04-seguranca.sql), que só tem SELECT,
+#      VIEW DEFINITION, SHOWPLAN e leitura de Query Store/DMVs. Esta é a barreira real.
+
+[[sources]]
+id = "pedidos"
+description = "Banco PedidosDb do docker compose (dados de exemplo)"
+# sslmode=require: criptografa sem validar o certificado autoassinado do container.
+dsn = "sqlserver://mcp_leitura:${MCP_DB_PASSWORD}@sqlserver:1433/PedidosDb?sslmode=require"
+
+[[tools]]
+name = "execute_sql"
+source = "pedidos"
+readonly = true
+max_rows = 500
+
+[[tools]]
+name = "search_objects"
+source = "pedidos"
+
+[[tools]]
+name = "explain_sql"
+source = "pedidos"
