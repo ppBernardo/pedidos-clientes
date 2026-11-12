@@ -8,7 +8,7 @@ paths:
 ## Scripts
 
 - **Idempotentes**: o `db-init` roda a cada `docker compose up`. Use `IF OBJECT_ID(...) IS NULL`, `IF NOT EXISTS (SELECT 1 FROM sys.indexes ...)` e faça a carga só com a tabela vazia.
-- **Sem `USE`** dentro dos scripts: o banco vem por `sqlcmd -d $(DB_NAME)`, o que permite reaproveitar os scripts no banco da Parte 4.
+- **Sem `USE` com nome fixo de banco**: o banco vem por `sqlcmd -d` ou pela variável `$(DB_NAME)`, o que permite reaproveitar os scripts no banco da Parte 4. A única exceção é `USE [master]`, para permissões de servidor.
 - Arquivo em UTF-8 sem BOM, executado com `sqlcmd -f 65001`. Literais com acento sempre como `N'...'`.
 - Segredos chegam por variável do sqlcmd (`$(APP_DB_PASSWORD)`), nunca escritos no script.
 - Ordem: `01-criar-banco`, `02-tabelas`, `03-indices`, `04-seguranca`, `05-carga-dados`. Índice novo vai em `03-indices.sql`.
