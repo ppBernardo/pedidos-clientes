@@ -28,8 +28,9 @@ docs/      spec.md, plan.md, diario-claude.md, parte4/
 | Subir tudo | `docker compose up --build` (front em :3000, API em :8080, SQL em :1433) |
 | Banco + MCP para desenvolvimento | `docker compose --profile dev up -d sqlserver db-init mcp-sqlserver` |
 | Build do backend | `dotnet build backend/Pedidos.slnx` |
-| Testes unitários | `dotnet test backend/tests/Pedidos.UnitTests` |
-| Testes de integração (precisam de Docker) | `dotnet test backend/tests/Pedidos.IntegrationTests` |
+| Testes unitários | `dotnet test --project backend/tests/Pedidos.UnitTests` |
+| Testes de integração (precisam de Docker) | `dotnet test --project backend/tests/Pedidos.IntegrationTests` |
+| Todos os testes do backend | `dotnet test --solution backend/Pedidos.slnx` |
 | API local (banco do compose) | `dotnet run --project backend/src/Pedidos.Api` |
 | Frontend | `npm ci --prefix frontend`, depois `npm run dev --prefix frontend` (lint: `npm run lint --prefix frontend`) |
 | Testes dos hooks | `node --test ".claude/hooks/**/*.test.mjs"` |
@@ -69,6 +70,7 @@ docs/      spec.md, plan.md, diario-claude.md, parte4/
 - Crie arquivos com as ferramentas Write/Edit. Redirecionamento do PowerShell grava BOM ou UTF-16 e quebra scripts SQL e shell.
 - `sqlcmd` dentro dos containers fica em `/opt/mssql-tools18/bin/sqlcmd` e precisa de `-C` (certificado autoassinado).
 - `dotnet build` falha com MSB3027 se um `dotnet run` estiver segurando `bin/`: pare a API antes.
+- Os testes rodam no Microsoft.Testing.Platform (xUnit v3, ativado no `global.json`). O `dotnet test` exige `--project` ou `--solution`, e os pacotes do VSTest (`Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio`) **não** devem ser adicionados.
 
 ## Regras detalhadas
 
