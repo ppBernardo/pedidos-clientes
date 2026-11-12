@@ -46,3 +46,20 @@ Registro cronológico de como o Claude Code foi usado neste projeto: o que funci
   - **testado ao vivo na própria sessão**: o Claude tentou `git commit --amend` via Bash e `git push --force` via PowerShell, e os dois foram bloqueados, com o motivo devolvido para ele.
 - **Correção**: o comando sugerido para rodar os testes dos hooks (`node --test .claude/hooks`) não funciona no Node 24, porque um diretório é tratado como arquivo. Trocado por um glob no CLAUDE.md.
 - **Limite de segurança do Claude Code**: o classificador do modo automático **bloqueou** a primeira versão do `.claude/settings.json`. Ela trazia uma lista `allow`, ou seja, o próprio agente se concedendo permissões (auto-modificação). Foi versionada só a parte que *restringe* (hook + regras `deny`). Uma lista `allow` para reduzir confirmações fica a critério do humano.
+
+## 2026-11-12: scripts SQL, frontend adiantado, hook de verificação e MCP
+
+- **Ordem adaptada ao ambiente.** Sem o SDK do .NET 10 e sem Docker na máquina, o Claude seguiu o plano B do `plan.md`:
+  - escreveu os scripts SQL (a validar quando o Docker chegar);
+  - adiantou o frontend, guiado só pelo contrato da seção 5 da spec.
+- **Falso alarme corrigido antes de virar código.**
+  - A checagem de fim de linha com `grep -c $'\r'` no Git Bash acusou CRLF em todos os arquivos. Na verdade, esse comando conta **todas** as linhas, porque o CR do padrão se perde.
+  - Antes de criar um hook para "converter", o Claude conferiu os bytes com `od` e com Node: os arquivos sempre estiveram em LF. Nenhum hook foi criado.
+  - Lição registrada: confirmar a evidência antes de agir sobre ela.
+- **Hook de verificação pós-edição** (`verificar-apos-edicao`):
+  - roda `dotnet build` do projeto mais próximo para C#, e `tsc -b` + oxlint para TypeScript;
+  - **testado ao vivo**: o Claude criou um arquivo com erro de tipo e recebeu o erro do `tsc` na mesma hora;
+  - tem lock contra builds simultâneos de edições em paralelo.
+- **MCP do SQL Server via HTTP.**
+  - O DBHub roda como serviço do compose (profile `dev`). O `.mcp.json` não depende do sistema operacional.
+  - O `explain_sql` do DBHub usa `EXPLAIN`, que o SQL Server 2022 não tem, então fica a validar. A alternativa já prevista é ler planos do Query Store e das DMVs com `execute_sql`.
