@@ -229,8 +229,140 @@ button:focus-visible {
   color: var(--cor-erro);
 }
 
+/* Alertas */
+
+.alerta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--raio);
+  margin: 0 0 16px;
+}
+
+.alerta p,
+.alerta ul {
+  margin: 0;
+}
+
+ul.alerta,
+div.alerta--erro {
+  display: block;
+}
+
+ul.alerta {
+  padding-left: 32px;
+}
+
+.alerta--sucesso {
+  background: var(--cor-sucesso-fundo);
+  color: var(--cor-sucesso);
+  border: 1px solid rgb(27 127 74 / 25%);
+}
+
+.alerta--erro {
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro);
+  border: 1px solid rgb(198 40 40 / 25%);
+}
+
+.botao--texto {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 4px 8px;
+  min-height: auto;
+}
+
+/* Modal */
+
+.modal {
+  width: min(680px, 100% - 32px);
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: none;
+  border-radius: var(--raio);
+  box-shadow: 0 20px 50px rgb(16 24 40 / 25%);
+  color: var(--cor-texto);
+}
+
+.modal::backdrop {
+  background: rgb(16 24 40 / 45%);
+}
+
+.modal__cabecalho,
+.modal__rodape {
+  padding: 16px 20px;
+}
+
+.modal__cabecalho {
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.modal__cabecalho h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.modal__corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.modal__rodape {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.modal__total {
+  margin: 0;
+  text-align: right;
+  font-size: 1.05rem;
+}
+
+.itens {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.itens legend {
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.itens > .botao {
+  align-self: flex-start;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 1fr 110px auto;
+  gap: 8px;
+  align-items: end;
+}
+
 @media (max-width: 760px) {
   .filtros {
     grid-template-columns: 1fr;
+  }
+
+  .item {
+    grid-template-columns: 1fr 90px;
+  }
+
+  .item__remover {
+    grid-column: 1 / -1;
   }
 }
