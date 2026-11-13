@@ -24,7 +24,10 @@ INSERT INTO dbo.Produtos (Nome, Preco, Estoque, Ativo)
 SELECT CONCAT(N'Produto ', g.value), 10 + (g.value * 37) % 4990, 1000, 1
 FROM GENERATE_SERIES(1, 500) AS g;
 
--- 94.608.000 s = 1.095 dias a partir de 2024-01-01 (2024, 2025 e 2026).
+-- 94.608.000 s = 1.095 dias a partir de 2024-01-01. Como 2024 é bissexto, a massa
+-- vai até 30/12/2026 23:59:59: não há pedidos em 31/12/2026. Isso não muda a
+-- comparação entre as queries, e o valor fica como está para os números medidos
+-- no README continuarem reproduzíveis.
 INSERT INTO dbo.Pedidos (ClienteId, DataPedido)
 SELECT 1 + (CAST(g.value AS BIGINT) * 7919) % 20000,
        DATEADD(SECOND,
