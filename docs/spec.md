@@ -278,7 +278,7 @@ Nos testes, cada critério também aparece como `[Trait("CA", "CA-xx")]`, e a bu
 | CA-08 | — | `ConcorrenciaTests.Post_VinteRequisicoesSimultaneas*`, `ConcorrenciaTests.Post_PedidosSimultaneosComOsMesmosProdutosEmOrdemCruzada_*` |
 | CA-09 | — | `ListarPedidosTests.Get_SemFiltros_*`, `ListarPedidosTests.Get_PedidosNoMesmoInstante_*` |
 | CA-10 | — | `ListarPedidosTests.Get_FiltrandoPorCliente_*`, `ListarPedidosTests.Get_ClienteSemPedidos_*` |
-| CA-11 | `PeriodoTests.Contem_*` | `ListarPedidosTests.Get_FiltrandoPorPeriodo_*` |
+| CA-11 | `PeriodoTests.FimExclusivoUtc_NoFimDeMesOuDeAno_*` | `ListarPedidosTests.Get_FiltrandoPorPeriodo_*` |
 | CA-12 | `ListarPedidosValidatorTests.*` | `ListarPedidosTests.Get_ParametroInvalido_*`, `Get_PaginaAlemDaUltima_*`, `Get_ParametroQueNaoEhNumero_*` |
 | CA-13 | — | `TopClientesTests.Get_DevolveOsCincoMaiores*`, `Get_ClientesHomonimos*`, `Get_IgnoraPedidosForaDoPeriodo*` |
 | CA-14 | `TopClientesValidatorTests.Validar_SemPeriodo_*` | `TopClientesTests.Get_PeriodoAusenteOuInvertido_*` |

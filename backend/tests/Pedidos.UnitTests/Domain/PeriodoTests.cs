@@ -6,9 +6,6 @@ public sealed class PeriodoTests
 {
     private static readonly Periodo Ano2026 = new(new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31));
 
-    private static bool Contem(Periodo periodo, DateTime instanteUtc) =>
-        instanteUtc >= periodo.InicioUtc && instanteUtc < periodo.FimExclusivoUtc;
-
     [Fact]
     [Trait("RN", "RN-11")]
     public void InicioUtc_EhAMeiaNoiteUtcDoPrimeiroDia()
@@ -23,17 +20,23 @@ public sealed class PeriodoTests
         Ano2026.FimExclusivoUtc.Should().Be(new DateTime(2027, 1, 1, 0, 0, 0, DateTimeKind.Utc));
     }
 
+    // As consultas filtram com DataPedido < FimExclusivoUtc. Com o fim na meia-noite
+    // do dia seguinte, 23:59:59 do último dia entra e 00:00 do dia seguinte fica fora.
+    // O predicado real é coberto na integração (Get_FiltrandoPorPeriodo_*).
     [Theory]
     [Trait("CA", "CA-11")]
-    [InlineData("2026-01-01T00:00:00", true)]
-    [InlineData("2026-12-31T23:59:59", true)]
-    [InlineData("2025-12-31T23:59:59", false)]
-    [InlineData("2027-01-01T00:00:00", false)]
-    public void Contem_IncluiOUltimoSegundoDoUltimoDiaEExcluiOsVizinhos(string instante, bool esperado)
+    [Trait("RN", "RN-11")]
+    [InlineData(2026, 2, 28, 2026, 3, 1)]
+    [InlineData(2028, 2, 29, 2028, 3, 1)]
+    [InlineData(2026, 4, 30, 2026, 5, 1)]
+    [InlineData(2100, 12, 31, 2101, 1, 1)]
+    public void FimExclusivoUtc_NoFimDeMesOuDeAno_EhAMeiaNoiteUtcDoDiaSeguinte(
+        int ano, int mes, int dia, int anoSeguinte, int mesSeguinte, int diaSeguinte)
     {
-        var instanteUtc = DateTime.SpecifyKind(DateTime.Parse(instante, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Utc);
+        var fim = new Periodo(null, new DateOnly(ano, mes, dia)).FimExclusivoUtc!.Value;
 
-        Contem(Ano2026, instanteUtc).Should().Be(esperado);
+        fim.Should().Be(new DateTime(anoSeguinte, mesSeguinte, diaSeguinte, 0, 0, 0, DateTimeKind.Utc));
+        fim.Kind.Should().Be(DateTimeKind.Utc);
     }
 
     [Fact]
