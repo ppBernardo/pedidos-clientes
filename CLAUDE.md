@@ -17,7 +17,7 @@ Cadastro e consulta de pedidos: SQL Server + API .NET 10 + React. A especificaç
 backend/   Pedidos.slnx: src/{Domain,Application,Infrastructure,Api} e tests/{UnitTests,IntegrationTests}
 frontend/  Vite + React + TypeScript (TanStack Query); chama sempre /api
 database/  scripts 01..05 (fonte da verdade do schema) + init-db.sh + perf/ (Parte 4)
-docs/      spec.md, plan.md, diario-claude.md, parte4/
+docs/      spec.md, plan.md, diario-claude.md (parte4/ é saída do database/perf/run-perf.sh, não é versionada)
 .claude/   settings.json (hooks e permissões), hooks/, rules/ (regras por pasta), skills/, agents/
 ```
 
