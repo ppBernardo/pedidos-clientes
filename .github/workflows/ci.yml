@@ -104,3 +104,49 @@ jobs:
       - name: Derruba o ambiente
         if: always()
         run: docker compose down -v
+
+  # O MCP que o Claude Code usa (DBHub via HTTP, profile dev): handshake MCP,
+  # ferramentas, uma leitura e a prova de que escrita não passa.
+  mcp:
+    name: MCP do SQL Server (smoke test)
+    runs-on: ubuntu-latest
+    needs: [backend]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Sobe banco e DBHub
+        run: docker compose --profile dev up -d sqlserver db-init mcp-sqlserver
+      - name: Espera o DBHub
+        run: |
+          for tentativa in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8090/healthz; then exit 0; fi
+            sleep 3
+          done
+          exit 1
+      - name: Conversa MCP (initialize, tools/list, execute_sql)
+        run: |
+          set -euo pipefail
+          url=http://127.0.0.1:8090/mcp
+          cabecalhos=(-H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream')
+          curl -sS -D sessao.txt "${cabecalhos[@]}" "$url" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}'
+          echo
+          id_sessao=$(grep -i '^mcp-session-id:' sessao.txt | cut -d' ' -f2 | tr -d '\r' || true)
+          if [ -n "$id_sessao" ]; then cabecalhos+=(-H "Mcp-Session-Id: $id_sessao"); fi
+          mcp() { curl -sS "${cabecalhos[@]}" "$url" -d "$1"; echo; }
+          mcp '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+          mcp '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | tee ferramentas.txt
+          grep -q execute_sql ferramentas.txt
+          mcp '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"execute_sql","arguments":{"sql":"SELECT COUNT(*) AS pedidos FROM dbo.Pedidos"}}}' | tee leitura.txt
+          grep -q 1500 leitura.txt
+          echo "--- tentativa de escrita (deve ser recusada):"
+          mcp '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"execute_sql","arguments":{"sql":"DELETE FROM dbo.ItensPedido"}}}'
+          mcp '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"execute_sql","arguments":{"sql":"SELECT COUNT(*) AS itens FROM dbo.ItensPedido"}}}' | tee depois.txt
+          test "$(docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Pedidos2026Sa -C -h -1 -d PedidosDb -Q 'SET NOCOUNT ON; SELECT COUNT(*) FROM dbo.ItensPedido' | tr -d ' \r')" -gt 0
+          echo "--- explain_sql (informativo):"
+          mcp '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"explain_sql","arguments":{"sql":"SELECT COUNT(*) FROM dbo.Pedidos WHERE DataPedido >= '"'"'2026-01-01'"'"'"}}}' || true
+      - name: Logs dos containers
+        if: failure()
+        run: docker compose --profile dev logs
+      - name: Derruba o ambiente
+        if: always()
+        run: docker compose --profile dev down -v
