@@ -146,3 +146,6 @@ Um subagente auditou o repositório inteiro contra o enunciado, só com leitura.
   - O 201 devolve `Location: /pedidos/{id}`, mas o nginx remove o prefixo `/api`. Quem seguisse o header pela porta 3000 caía no `index.html` da SPA.
   - Correção: `proxy_redirect / /api/;`.
   - O smoke do compose agora segue o `Location` e confere que chega ao mesmo pedido.
+- **Comando de medição da skill `analisar-query` que não funcionava** (`fix:`).
+  - Ele usava `docker compose exec` no serviço `sqlserver`, que não monta `database/`, e expandia `$SA_PASSWORD` no host, onde a variável não existe.
+  - Trocado pela forma que o `parte4.yml` já usa: o serviço `db-init`, que tem o sqlcmd, a pasta montada e a senha no ambiente.

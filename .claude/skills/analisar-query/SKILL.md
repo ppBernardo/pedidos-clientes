@@ -39,12 +39,20 @@ Prove cada hipótese com dados:
 
 ## 3. Medir (sqlcmd como admin, cache quente)
 
+A medição completa (4 estados, estatísticas e planos reais em `docs/parte4/`) é o `run-perf.sh`:
+
 ```bash
-MSYS_NO_PATHCONV=1 docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcmd \
-  -S localhost -U sa -P "$SA_PASSWORD" -C -d PedidosPerf -i /database/perf/<script>.sql
+MSYS_NO_PATHCONV=1 docker compose run --rm --user root -v ./docs/parte4:/saida --entrypoint bash db-init /database/perf/run-perf.sh
 ```
 
-- `SET STATISTICS IO, TIME ON;` e plano real (`SET STATISTICS XML ON;`). Salve o `.sqlplan` em `docs/parte4/`.
+Para um script avulso, use o serviço `db-init`, que já tem o sqlcmd, a pasta `database/` montada e o `SA_PASSWORD` no ambiente. O serviço `sqlserver` não monta `database/`, e no host a variável não existe. As aspas simples fazem a variável ser expandida dentro do container:
+
+```bash
+MSYS_NO_PATHCONV=1 docker compose run --rm --entrypoint bash db-init -c \
+  '/opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P "$SA_PASSWORD" -C -b -f 65001 -d PedidosPerf -i /database/perf/<script>.sql'
+```
+
+- `SET STATISTICS IO, TIME ON;` e plano real (`SET STATISTICS XML ON;`). Os `.sqlplan` vão para `docs/parte4/`, que é saída local e não é versionada. No CI, eles viram artefato do `parte4.yml`.
 - Use **literais ou `sp_executesql`**, nunca variável local. Com variável local o otimizador estima por densidade média e escolhe outro plano.
 - Rode duas vezes e registre a segunda (cache quente): leituras lógicas por tabela, CPU e tempo decorrido.
 
