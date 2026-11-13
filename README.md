@@ -205,6 +205,7 @@ flowchart LR
 | `new(...)` com tipo inferido como único argumento de `params` (CS8752), **repetido** num segundo arquivo. | O hook pegou as duas vezes; a correção definitiva foi trocar por *collection expression* |
 | Teste "cliente inexistente" passando pelo motivo errado: o NSubstitute devolve `""`, e não `null`, para `string`. | Cenário configurado explicitamente no teste |
 | `Program.cs` lia a connection string antes do `Build()`, e os testes não conseguiriam trocá-la. | Leitura na criação do `DbContext` |
+| **1ª execução real no CI:** 37 de 42 testes de integração quebraram. Um teste adiantava o `FakeTimeProvider` e os seguintes tentavam voltar o relógio, o que ele proíbe. | `TimeProvider` mínimo e ajustável nos testes. Na 2ª execução, 42 de 42 passaram |
 | OpenAPI documentando a query string em PascalCase, diferente do contrato. | Transformer na API, sem poluir a Application |
 | Um commit intermediário não compila sozinho: o registro de DI entrou antes das consultas. | **Não** foi reescrito, porque o histórico é preservado; está registrado no diário |
 | Subagente revisor com 2 falsos positivos. | Conferidos no código e descartados |
@@ -297,7 +298,7 @@ Roteiro da skill [`analisar-query`](.claude/skills/analisar-query/SKILL.md):
 Para reproduzir, com o compose no ar:
 
 ```bash
-MSYS_NO_PATHCONV=1 docker compose run --rm -v ./docs/parte4:/saida --entrypoint bash db-init /database/perf/run-perf.sh
+MSYS_NO_PATHCONV=1 docker compose run --rm --user root -v ./docs/parte4:/saida --entrypoint bash db-init /database/perf/run-perf.sh
 ```
 
 ## O que ficou de fora

@@ -4,7 +4,8 @@
 #
 # Rodar com o banco do compose no ar (reaproveita o serviço db-init, que já tem
 # o sqlcmd e a pasta database/ montada):
-#   MSYS_NO_PATHCONV=1 docker compose run --rm -v ./docs/parte4:/saida --entrypoint bash db-init /database/perf/run-perf.sh
+#   MSYS_NO_PATHCONV=1 docker compose run --rm --user root -v ./docs/parte4:/saida --entrypoint bash db-init /database/perf/run-perf.sh
+# (--user root porque, no Linux, o usuário mssql da imagem não grava na pasta montada do host)
 #
 # Saída em docs/parte4/: estatísticas (.txt), planos reais (.sqlplan, que abrem
 # no SSMS ou na extensão mssql do VS Code) e resumo.txt.

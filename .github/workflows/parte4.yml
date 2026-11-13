@@ -1,0 +1,63 @@
+name: Parte 4 (medição da query de ranking)
+
+# Roda o cenário de erros e a medição de performance da Parte 4 num runner
+# com Docker, e imprime no log as leituras lógicas, os tempos e os operadores
+# dos planos reais. Os .sqlplan ficam como artefato da execução.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "database/**"
+      - ".github/workflows/parte4.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  medir:
+    name: Cenário de erros e medição (A/B/C/D)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Banco com a carga de exemplo (db-init)
+        run: docker compose run --rm db-init
+
+      - name: Cenário de erros (original x corrigida, termina em ROLLBACK)
+        run: |
+          docker compose run --rm --entrypoint bash db-init -c \
+            '/opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P "$SA_PASSWORD" -C -b -f 65001 -W -s " | " \
+               -d PedidosDb -v CONSULTAS=/database/consultas -i /database/consultas/cenario-erros.sql'
+
+      - name: Medição com volume (PedidosPerf)
+        run: |
+          mkdir -p docs/parte4
+          docker compose run --rm --user root -v "$PWD/docs/parte4:/saida" --entrypoint bash db-init /database/perf/run-perf.sh
+
+      - name: Operadores dos planos reais
+        run: |
+          python3 - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+
+          ns = {"p": "http://schemas.microsoft.com/sqlserver/2004/07/showplan"}
+          for arquivo in sorted(glob.glob("docs/parte4/*.sqlplan")):
+              print(f"== {arquivo}")
+              for op in ET.parse(arquivo).getroot().iter(f"{{{ns['p']}}}RelOp"):
+                  objeto = op.find("./*/p:Object", ns)
+                  nome = f" {objeto.get('Table')}.{objeto.get('Index')}" if objeto is not None else ""
+                  contadores = op.findall("p:RunTimeInformation/p:RunTimeCountersPerThread", ns)
+                  reais = sum(int(c.get("ActualRows", 0)) for c in contadores)
+                  print(f"  {op.get('PhysicalOp')} ({op.get('LogicalOp')}){nome}"
+                        f" | estimadas={float(op.get('EstimateRows')):.0f} reais={reais}")
+          PY
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: parte4-planos-e-estatisticas
+          path: docs/parte4/
+
+      - name: Derruba o ambiente
+        if: always()
+        run: docker compose down -v
