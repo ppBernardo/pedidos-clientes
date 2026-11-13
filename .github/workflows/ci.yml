@@ -95,6 +95,7 @@ jobs:
           id=$(echo "$criado" | jq '.id')
           # Pelo proxy, o Location precisa voltar com o prefixo /api e levar ao mesmo pedido.
           location=$(grep -i '^location:' criado.txt | cut -d' ' -f2 | tr -d '\r')
+          echo "Location pelo proxy: $location"
           test "$location" = "/api/pedidos/$id"
           curl -fsS "$base$location" | jq -e ".id == $id"
           curl -fsS "$base/api/pedidos?tamanhoPagina=1" | jq -e ".itens[0].id == $id"
