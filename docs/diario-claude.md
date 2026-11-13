@@ -137,3 +137,12 @@ Registro cronológico de como o Claude Code foi usado neste projeto: o que funci
   A verificação achou um erro no README: o roteiro dizia que pedir acima do estoque mostraria o 422 da API, mas a tela barra antes.
 
   Na automação do navegador, inputs disparados rápido demais se perdiam entre re-renders do React. Era problema do teste, não do código, e foi confirmado antes de mexer em qualquer coisa.
+
+## 2026-11-13: revisão final contra o enunciado
+
+Um subagente auditou o repositório inteiro contra o enunciado, só com leitura. Cada achado foi conferido no código antes de virar commit, e dois deles foram testados ao vivo.
+
+- **`Location` errado pelo proxy** (`fix:`).
+  - O 201 devolve `Location: /pedidos/{id}`, mas o nginx remove o prefixo `/api`. Quem seguisse o header pela porta 3000 caía no `index.html` da SPA.
+  - Correção: `proxy_redirect / /api/;`.
+  - O smoke do compose agora segue o `Location` e confere que chega ao mesmo pedido.

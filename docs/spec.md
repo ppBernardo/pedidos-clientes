@@ -137,7 +137,7 @@ Base: `http://localhost:8080` (direto) ou `http://localhost:3000/api` (via proxy
 
 | Status | Quando |
 |---|---|
-| **201 Created** | Pedido criado. Header `Location: /pedidos/{id}` e corpo = detalhe do pedido (5.2). |
+| **201 Created** | Pedido criado. Header `Location: /pedidos/{id}` (pelo proxy do frontend, `/api/pedidos/{id}`) e corpo = detalhe do pedido (5.2). |
 | **400 Bad Request** | JSON inválido ou violação de RN-01, 02, 06 ou 07 (`ValidationProblemDetails` com `errors` por campo, ex.: `itens[1].quantidade`). |
 | **422 Unprocessable Entity** | Violação de RN-03, 04, 05 ou 08/09. |
 

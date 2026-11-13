@@ -84,15 +84,19 @@ jobs:
           done
           echo "A aplicação não subiu a tempo."
           exit 1
-      - name: Fluxo de ponta a ponta (listar, criar, ver no topo, relatório)
+      - name: Fluxo de ponta a ponta (listar, criar, seguir o Location, ver no topo, relatório)
         run: |
           set -euo pipefail
           base=http://localhost:3000
           curl -fsS -o /dev/null "$base/"
           test "$(curl -fsS "$base/api/pedidos?tamanhoPagina=1" | jq '.totalItens')" -eq 1500
-          criado=$(curl -fsS -X POST "$base/api/pedidos" -H 'Content-Type: application/json' \
+          criado=$(curl -fsS -D criado.txt -X POST "$base/api/pedidos" -H 'Content-Type: application/json' \
             -d '{"clienteId": 1, "itens": [{"produtoId": 3, "quantidade": 1}]}')
           id=$(echo "$criado" | jq '.id')
+          # Pelo proxy, o Location precisa voltar com o prefixo /api e levar ao mesmo pedido.
+          location=$(grep -i '^location:' criado.txt | cut -d' ' -f2 | tr -d '\r')
+          test "$location" = "/api/pedidos/$id"
+          curl -fsS "$base$location" | jq -e ".id == $id"
           curl -fsS "$base/api/pedidos?tamanhoPagina=1" | jq -e ".itens[0].id == $id"
           curl -fsS "$base/api/relatorios/top-clientes?dataInicio=2026-01-01&dataFim=2026-12-31" | jq -e 'length == 5'
           status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/api/pedidos" \
