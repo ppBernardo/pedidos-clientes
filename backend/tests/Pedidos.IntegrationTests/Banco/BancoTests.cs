@@ -62,6 +62,15 @@ public sealed class BancoTests(AmbienteDeTeste ambiente) : TesteDeIntegracao(amb
     }
 
     [Fact]
+    public void ImagemDoContainer_EhAMesmaDoCompose()
+    {
+        var compose = File.ReadAllText(Repositorio.Pasta("docker-compose.yml"));
+
+        compose.Should().Contain($"&sqlserver-imagem {AmbienteDeTeste.ImagemSqlServer}",
+            "os testes precisam rodar na mesma versão do SQL Server que o docker compose sobe");
+    }
+
+    [Fact]
     public async Task ModeloDoEf_ConsultaTodasAsTabelasDoSchemaRealComOLoginDaApi()
     {
         var cliente = await Banco.CriarClienteAsync("Ana Souza");
