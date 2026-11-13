@@ -154,6 +154,7 @@ Um subagente auditou o repositório inteiro contra o enunciado, só com leitura.
     - Com `absolute_redirect` ligado (o padrão), ele vira `http://localhost/api/pedidos/N`, com a porta interna do container (80), e não a publicada (3000).
     - Correção: `absolute_redirect off`.
     - O passo falhava em silêncio, então agora imprime o `Location` antes de comparar.
+    - Na execução seguinte do CI (43432147558), o smoke passou seguindo o `Location` pelo proxy.
 - **Comando de medição da skill `analisar-query` que não funcionava** (`fix:`).
   - Ele usava `docker compose exec` no serviço `sqlserver`, que não monta `database/`, e expandia `$SA_PASSWORD` no host, onde a variável não existe.
   - Trocado pela forma que o `parte4.yml` já usa: o serviço `db-init`, que tem o sqlcmd, a pasta montada e a senha no ambiente.
@@ -172,6 +173,10 @@ Um subagente auditou o repositório inteiro contra o enunciado, só com leitura.
   - Quatro testes citados na rastreabilidade da spec estavam sem `[Trait("CA")]`, e quatro referências da tabela não casavam com nenhum nome de teste. Um script agora cruza a tabela com os traits: 41 testes, nenhuma pendência.
   - O 400 de validação ganhou asserção de `traceId`. Antes, a API foi rodada localmente para confirmar que ele já vinha.
   - O teste unitário do CA-11 exercitava um helper do próprio teste e passou a testar a propriedade de produção.
+  - Um teste de integração confere que a imagem do Testcontainers é a mesma do compose. Antes, a regra dependia de duas strings mantidas à mão.
+- **Hook de verificação que ignorava o `global.json`** (`fix:`).
+  - O arquivo fica na raiz, mas o hook só o reconhecia dentro de `backend/`.
+  - Agora editar o `global.json` dispara o build da solução, com teste novo no hook.
 - **Afirmações sobre o processo, corrigidas no README, no plano e neste diário.** O `git log` desmentia três delas:
   - "cada correção virou um commit `fix:` próprio": três correções do M4 nunca chegaram a commit, e o `8d2178b` saiu como `refactor:`;
   - "cada commit compila": o `7a954ff` não compila, e a integração ficou vermelha em 28 commits;
