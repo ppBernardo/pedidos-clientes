@@ -189,7 +189,17 @@ flowchart LR
    - `search_objects`: inspecionar tabelas, colunas e índices;
    - `execute_sql`: conferir a carga e ler planos e métricas do Query Store e das DMVs.
 
+   - `explain_sql`: obter o plano estimado em XML.
+
    A skill `analisar-query` traz o roteiro e as consultas de diagnóstico prontas. Mudanças de schema nunca passam pelo MCP: vão por script versionado.
+
+**MCP validado no CI.** O job `mcp` do workflow conversa com o DBHub como o Claude Code faria:
+- handshake MCP via HTTP (protocolo `2025-06-18`);
+- `tools/list` com as 3 ferramentas;
+- uma leitura pelo `execute_sql` (os 1.500 pedidos da carga);
+- um `DELETE`, **recusado pelo próprio DBHub** ("Read-only"), com a contagem conferida direto no banco depois.
+
+**O que não foi possível nesta máquina:** usar o MCP interativamente numa sessão do Claude Code. Isso exige o banco rodando localmente, e não havia Docker. Por isso as evidências da Parte 4 vêm do `sqlcmd` rodando no CI. Com Docker, os passos acima ligam o MCP na sessão.
 
 ### O que funcionou bem
 
@@ -210,6 +220,8 @@ flowchart LR
 | OpenAPI documentando a query string em PascalCase, diferente do contrato. | Transformer na API, sem poluir a Application |
 | Um commit intermediário não compila sozinho: o registro de DI entrou antes das consultas. | **Não** foi reescrito, porque o histórico é preservado; está registrado no diário |
 | Subagente revisor com 2 falsos positivos. | Conferidos no código e descartados |
+| Script de medição da Parte 4 com `sqlcmd -y 0 -h -1`, combinação que o sqlcmd recusa. A 1ª execução falhou. | Removido o `-h` |
+| **Afirmações minhas desmentidas pela evidência:** "o otimizador converte o LEFT JOIN em INNER" (o plano real mostrou que não), "o `explain_sql` não funciona no SQL Server" (funciona) e "o modal mostra o 422 ao pedir acima do estoque" (a tela barra antes). | README e diário corrigidos com o que foi medido e observado |
 
 **Limites do Claude Code encontrados.**
 - O modo automático **bloqueou** a tentativa do agente de se dar permissões (uma lista `allow` no `settings.json`). Por isso o `settings.json` versionado só restringe.
@@ -234,17 +246,26 @@ ORDER BY Total
 | 1 | `ORDER BY Total` é **ascendente** | O "ranking" começa por quem comprou **menos** |
 | 2 | `GROUP BY c.Nome` | Nome não é chave: **homônimos viram uma pessoa só**, com os totais somados. Pior: na collation padrão (`SQL_Latin1_General_CP1_CI_AS`, case-insensitive e que ignora espaço final), `'ANA SOUZA '` e `'Ana Souza'` também se fundem. A carga de exemplo tem duas "Maria Silva" justamente para mostrar isso. |
 | 3 | 2º `LEFT JOIN` (itens) | Pedido de 2026 **sem itens** dá `Total = NULL`, e no `ASC` o NULL vem **primeiro**. O banco não impede pedido sem itens; a API sim. Mover o filtro de data para o `ON` "corrigiria" o join, mas traria todos os clientes com NULL. O certo num ranking de compras é `INNER JOIN`. |
-| 4 | 1º `LEFT JOIN` + `WHERE YEAR(p.DataPedido) = 2026` | O `WHERE` sobre `p` já descarta as linhas sem pedido, então o `LEFT` é enganoso: na prática é INNER. Não é bug de resultado, mas esconde a intenção. |
+| 4 | 1º `LEFT JOIN` + `WHERE YEAR(p.DataPedido) = 2026` | O `WHERE` sobre `p` já descarta as linhas sem pedido, então o resultado é o de um INNER JOIN. Não é bug de resultado, mas esconde a intenção e, como o plano real mostrou, atrapalha o otimizador (ver abaixo). |
 | 5 | Sem desempate | Clientes com o mesmo total saem em ordem instável |
 
-O cenário [`database/consultas/cenario-erros.sql`](database/consultas/cenario-erros.sql) prova os itens 1 a 3 sobre a carga de exemplo, rodando as duas queries dentro de uma transação que termina em `ROLLBACK`.
+O cenário [`database/consultas/cenario-erros.sql`](database/consultas/cenario-erros.sql) roda as duas queries sobre a carga de exemplo dentro de uma transação que termina em `ROLLBACK`. Dentro dela, cria uma cliente `'ANA SOUZA '` com um pedido de 2026 e um pedido de 2026 sem itens. Resultado real ([execução 43335181912 no CI](https://github.com/ppBernardo/pedidos-clientes/actions/runs/43335181912)):
 
-### Por que era lenta
+| Query original (as primeiras e as últimas linhas) | Query corrigida |
+|---|---|
+| `Otávio Brandão NULL` ← **1ª linha**: pedido sem itens | Otávio não aparece: num ranking de compras só entra quem comprou |
+| `Camila Ribeiro 54912.30` ... ordem **crescente** | `1 · Maria Silva (Id 4) 300307.40` |
+| `Ana Souza 271588.30` ← Ana **+ 'ANA SOUZA '** (266.988,40 + 4.599,90) | `2 · João Pereira 299446.80` |
+| `João Pereira 299446.80` | `5 · Ana Souza (Id 1) 266988.40` |
+| `Maria Silva 401709.50` ← **as duas Marias fundidas** (300.307,40 + 101.402,10), aparecendo como a "maior" | `12 · Maria Silva (Id 19) 101402.10`, e `27 · ANA SOUZA (Id 31) 4599.90` |
 
-- **`YEAR(p.DataPedido) = 2026` não é sargable.** Com uma função sobre a coluna, o otimizador não consegue fazer *seek* num índice de `DataPedido`: lê a tabela inteira e aplica a função linha a linha.
-- **FKs sem índice.** O SQL Server não cria índice para FK. Sem índice em `ItensPedido.PedidoId`, o join com a maior tabela vira *scan* + *hash join*.
-- **Agrupamento por `NVARCHAR(150)`.** O *hash aggregate* fica largo e ainda há o *sort* final.
-- Observação: o `LEFT JOIN` **não** é a causa da lentidão. Como o `WHERE` rejeita NULL, o otimizador já o transforma em INNER JOIN.
+### Por que era lenta (o que os planos reais mostraram)
+
+- **`YEAR(p.DataPedido) = 2026` não é sargable.** Mesmo com `IX_Pedidos_DataPedido`, o plano da original faz **Index Scan dos 400 mil pedidos** e aplica a função linha a linha. A corrigida faz **Index Seek** só nos 132.964 de 2026.
+- **O `YEAR()` também atrapalha as estimativas.** A original estimou 114.789 pedidos em 2026 (eram 132.964) e 120.000 itens (eram 398.919). A corrigida estimou 132.942 contra 132.964 reais.
+- **O LEFT JOIN não virou INNER.** Eu esperava que o otimizador convertesse o join, já que o `WHERE` rejeita NULL. O plano real mostrou outra coisa: `Hash Match (Left Outer Join)` entre os 20 mil clientes e **todos** os 400 mil pedidos, e só depois o `Filter` do `YEAR()`. Com a função em volta da coluna, ele não empurrou o filtro para antes do join. Neste volume o custo extra foi pequeno, porque o que domina é ler as tabelas, mas a premissa não se confirmou.
+- **FKs sem índice.** O SQL Server não cria índice para FK. Sem índice em `ItensPedido.PedidoId`, o join com a maior tabela é sempre *scan* + *hash join* da tabela inteira.
+- **Agrupamento por `NVARCHAR(150)`.** Além de errado, junta **20.000 clientes em 2.000 grupos** no `Hash Match (Aggregate)`, porque a massa repete os nomes.
 
 ### A query corrigida
 
@@ -293,8 +314,25 @@ Roteiro da skill [`analisar-query`](.claude/skills/analisar-query/SKILL.md):
    | 3 | Original | Com os de `03-indices.sql` |
    | 4 | Corrigida | Com os de `03-indices.sql` |
 
-   Para cada estado ficam salvos `SET STATISTICS IO, TIME` e o **plano real** (`.sqlplan`), em `docs/parte4/`. Os índices ficam num script separado (`03-indices.sql`) justamente para permitir essa comparação.
-4. **Inspeção pelo MCP** (somente leitura): estrutura dos índices, Query Store (leituras lógicas médias por plano) e índices ausentes sugeridos pelo otimizador.
+   Para cada estado ficam salvos `SET STATISTICS IO, TIME` e o **plano real** (`.sqlplan`). Os índices ficam num script separado (`03-indices.sql`) justamente para permitir essa comparação.
+4. **Onde rodou.** A máquina de desenvolvimento não tinha Docker, então a medição roda no workflow [`parte4.yml`](.github/workflows/parte4.yml), num runner do GitHub Actions. O workflow publica na página da execução a tabela abaixo e os operadores de cada plano real, e guarda os `.sqlplan` como artefato.
+
+**Resultado medido** ([execução 43335181912](https://github.com/ppBernardo/pedidos-clientes/actions/runs/43335181912), cache quente, 400 mil pedidos e 1,2 milhão de itens). As leituras lógicas são determinísticas; os tempos variam um pouco entre execuções.
+
+| Estado | Leituras lógicas | CPU | Tempo | Acesso a `Pedidos` no plano real |
+|---|---|---|---|---|
+| 1 · original, sem índices | 10.066 (Itens 7.273 · Pedidos 1.934 · Clientes 859) | 643 ms | 185 ms | Clustered Index **Scan**, os 400 mil |
+| 2 · corrigida, sem índices | 10.066 | 589 ms | 180 ms | Clustered Index **Scan**, com o predicado empurrado para o scan |
+| 3 · original, com índices | 6.566 (Itens 4.659 · Pedidos 1.048 · Clientes 859) | 439 ms | 126 ms | Index **Scan** em `IX_Pedidos_DataPedido`, os 400 mil |
+| 4 · corrigida, com índices | **5.853** (Itens 4.659 · Pedidos **335** · Clientes 859) | **353 ms** | 135 ms | Index **Seek** em `IX_Pedidos_DataPedido`, só os 132.964 de 2026 |
+
+**Leitura honesta dos números**
+- **Reescrever sem índice não muda o custo** (1 → 2): sargabilidade só ajuda quando existe um índice para buscar.
+- **Com índices, só a query corrigida faz seek** (3 → 4): a leitura de `Pedidos` cai de 1.048 para 335 páginas. Do estado 1 ao 4, as leituras caem 42% e a CPU 45%.
+- **O que sobra é ler os itens.** Um terço deles é de 2026, então o otimizador escolhe scan do índice coberto + hash join, que é mais barato que 400 mil seeks.
+  - O próximo passo, se esse ranking fosse crítico, seria materializar o total, com uma view indexada por pedido e dia ou um `ValorTotal` em `Pedidos`. A spec optou por não fazer isso, para ter uma fonte única da verdade.
+  - Com períodos menores (um mês, por exemplo), o ganho do seek cresce na mesma proporção.
+- **O ganho mais importante desta query é de corretude:** o ranking original estava errado.
 
 Para reproduzir, com o compose no ar:
 
