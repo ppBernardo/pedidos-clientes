@@ -26,6 +26,12 @@ test('arquivo de build do backend aponta para a solução', () => {
   assert.deepEqual(acao, { tipo: 'dotnet', alvo: path.join(raiz, 'backend', 'Pedidos.slnx') });
 });
 
+test('global.json da raiz aponta para a solução', () => {
+  const { raiz } = criarProjetoFalso();
+  const acao = classificar(path.join(raiz, 'global.json'), raiz);
+  assert.deepEqual(acao, { tipo: 'dotnet', alvo: path.join(raiz, 'backend', 'Pedidos.slnx') });
+});
+
 test('arquivo .tsx do frontend vira verificação do frontend', () => {
   const { raiz } = criarProjetoFalso();
   const acao = classificar(path.join(raiz, 'frontend', 'src', 'App.tsx'), raiz);

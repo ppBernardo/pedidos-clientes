@@ -13,6 +13,11 @@ export function classificar(arquivo, raiz) {
   const partes = relativo.split(path.sep);
   if (partes[0] === '..' || path.isAbsolute(relativo)) return null; // fora do projeto
 
+  // O global.json fica na raiz e define o SDK e o runner de testes do backend inteiro.
+  if (relativo === 'global.json') {
+    return { tipo: 'dotnet', alvo: path.join(raiz, 'backend', 'Pedidos.slnx') };
+  }
+
   if (partes[0] === 'backend') {
     if (/\.(cs|csproj)$/i.test(relativo)) {
       const projeto = csprojMaisProximo(path.dirname(path.join(raiz, relativo)), path.join(raiz, 'backend'));
