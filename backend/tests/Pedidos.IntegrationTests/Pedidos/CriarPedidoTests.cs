@@ -105,7 +105,9 @@ public sealed class CriarPedidoTests(AmbienteDeTeste ambiente) : TesteDeIntegrac
         var resposta = await Api.CriarPedidoAsync(1, Cancelamento, (1, 1), (2, 0));
 
         resposta.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await resposta.LerProblemaAsync(Cancelamento)).Errors.Should().ContainKey("itens[1].quantidade");
+        var problema = await resposta.LerProblemaAsync(Cancelamento);
+        problema.Errors.Should().ContainKey("itens[1].quantidade");
+        problema.TraceId.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
