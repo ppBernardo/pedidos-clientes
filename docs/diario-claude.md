@@ -153,3 +153,6 @@ Um subagente auditou o repositório inteiro contra o enunciado, só com leitura.
   - O `run-perf.sh` não criava os usuários no `PedidosPerf`. Mesmo com Docker, o roteiro de inspeção da skill só enxergaria os 1.500 pedidos do `PedidosDb`.
   - Agora o script cria os usuários, e o MCP lê o `PedidosPerf` com nomes de três partes (`PedidosPerf.dbo.Pedidos`).
   - O `parte4.yml` passou a conferir isso pelo próprio DBHub: a contagem e o Query Store da medição.
+- **Subagente `revisor` antes do push desta rodada.** Ele liberou o push e apontou um problema real (`fix:`): a leitura do Query Store pelo MCP não conferia nada, e um erro do DBHub iria para o resumo como se fosse evidência.
+  - A correção que ele sugeriu (`! grep -q '"isError":true'`) não funcionaria: com `set -e`, o bash ignora o código de saída de um comando negado com `!`.
+  - O passo usa um `if` explícito.

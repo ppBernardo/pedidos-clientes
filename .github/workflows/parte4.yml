@@ -117,6 +117,13 @@ jobs:
                JOIN PedidosPerf.sys.query_store_runtime_stats AS rs ON rs.plan_id = p.plan_id
                WHERE qt.query_sql_text LIKE N'%GROUP BY%'
                ORDER BY rs.avg_logical_io_reads DESC")" | tee query-store.txt
+          # Um erro do DBHub não pode ir para o resumo como se fosse evidência. O teste
+          # é um if explícito: com set -e, "! grep" nunca derrubaria o passo.
+          grep -q '"result"' query-store.txt
+          if grep -q -e '"isError":true' -e '"error":{"code"' query-store.txt; then
+            echo "O DBHub devolveu erro na leitura do Query Store."
+            exit 1
+          fi
           {
             echo "### MCP (DBHub, login mcp_leitura) lendo o PedidosPerf"
             echo
