@@ -4,7 +4,7 @@
 |---|---|
 | **Spec** | [docs/spec.md](spec.md) (v1.0) |
 | **Gerado em** | 2026-11-12, Claude Code em *plan mode* (Claude Opus 5.5) |
-| **Status** | Aprovado; desvios registrados no fim do documento |
+| **Status** | Aprovado e executado; desvios e retrospectiva nas seções 5 e 6 |
 
 ## Como este plano foi produzido
 
@@ -174,3 +174,35 @@ Evidências:
 | M8 | lint, tsc e build verdes; roteiro manual em `localhost:3000` |
 | M9 | massa reproduzível; original × corrigida divergem no cenário; corrigida = endpoint |
 | M10 | clone limpo sem `.env` → `docker compose up` funciona; CI verde |
+
+---
+
+## 5. Desvios durante a implementação
+
+Comparação do plano aprovado com o que de fato aconteceu. O detalhe de cada episódio está no [diário](diario-claude.md).
+
+| O plano previa | O que aconteceu | Por quê |
+|---|---|---|
+| Backend (M3–M7) antes do frontend (M8) | Scripts SQL e frontend feitos antes do backend | O SDK do .NET 10 e o Docker ainda não estavam na máquina. O próprio plano previa essa troca. |
+| SDK do .NET 10 instalado pelo usuário | Instalado **por usuário** com o script oficial `dotnet-install`, sem admin; o hook de build foi ajustado para achar esse SDK | A instalação não tinha acontecido e o backend estava bloqueado |
+| Testes em xUnit v3 (runner não definido) | Microsoft.Testing.Platform, ativado no `global.json` | O xUnit v3 4.x não roda no modo VSTest do SDK 10 |
+| M2/M5/M6 validados localmente; pausa para reiniciar a sessão e usar o MCP | Integração (42 testes), `docker compose up` e MCP validados **no GitHub Actions**, com jobs de smoke test para o compose e o MCP. O **uso interativo do MCP numa sessão local não aconteceu** | A máquina continuou sem Docker até o fim |
+| Skills criadas e usadas em sequência | A `novo-endpoint` só pôde ser usada depois de um reinício da sessão | Skills e subagentes só carregam quando a sessão começa |
+| Parte 4 investigada pelo MCP, em 3 estados (A/B/C), com os `.sqlplan` em `docs/parte4/` | Medição no workflow `parte4.yml`, em **4 estados**. Os números e os operadores dos planos estão no README; os `.sqlplan` ficam como artefato da execução | Sem Docker local. O estado extra (corrigida sem índices) mostrou que a reescrita sozinha não muda o custo |
+| Diagnóstico aceito na revisão: "o LEFT JOIN não é causa de lentidão; o otimizador o converte em INNER" | O plano real manteve o `Left Outer Join` e aplicou o `YEAR()` depois do join | A evidência derrubou a premissa, e o README foi corrigido |
+| Frontend verificado em `localhost:3000` com a API real | Verificado no navegador contra um mock que segue o contrato da spec; o fluxo pela API real é coberto pelo smoke test do compose no CI | Sem Docker local |
+| Cerca de 55 commits | 84 commits | Cada correção virou um commit `fix:` próprio, como este plano pedia, e o CI rendeu commits a mais |
+| Subagente `revisor` antes de cada push | Usado antes do primeiro push, que concentrou quase todo o código | Os pushes seguintes foram correções pequenas, validadas pelo CI |
+
+## 6. Retrospectiva
+
+**O plano acertou em:**
+- Spec com RN e CA numerados. Ela guiou testes, endpoints e a rastreabilidade sem retrabalho.
+- Ter um plano B para a falta de SDK e de Docker. A ordem mudou e o trabalho não parou.
+- Usar os mesmos scripts SQL no compose e nos testes. A primeira execução real do banco no CI funcionou de primeira.
+- A revisão crítica independente, que evitou cinco problemas antes do código existir.
+
+**O plano errou ou subestimou:**
+- **A dependência do ambiente.** Validar só no CI funcionou, mas deixou o MCP sem uso interativo, justamente um dos itens avaliados.
+- **Premissas sobre o otimizador.** O plano tratou como fato o que só a medição podia confirmar.
+- **Os testes de integração ficaram muito tempo sem rodar.** Eles foram escritos bem antes da primeira execução, e o bug do relógio de teste só apareceu no CI. Publicar no GitHub mais cedo teria antecipado isso.
