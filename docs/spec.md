@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Aprovada (revisada junto com o plano em plan mode) |
-| **Versão** | 1.0 (2026-11-12) |
+| **Versão** | 1.1 (2026-11-13): alinhada ao código na revisão final. A 1.0 é de 2026-11-12. |
 | **Plano** | [docs/plan.md](plan.md) |
 
 ## 1. Objetivo
@@ -113,11 +113,13 @@ O valor total do pedido **não é armazenado**: a fonte da verdade são os itens
 | RN-09 | A criação é **atômica**: pedido, itens e baixa de estoque são gravados numa única transação; qualquer falha desfaz tudo. Com requisições concorrentes o estoque **nunca fica negativo**: a baixa é condicional (`UPDATE ... WHERE Estoque >= @quantidade`) e o `CHECK` do banco é a última barreira. | 422 `ESTOQUE_INSUFICIENTE` |
 | RN-10 | O **preço unitário** do item é o preço do produto no momento da criação. O cliente da API **não envia preço**. Valor total = `Σ quantidade × preço unitário`. | — |
 | RN-11 | A **data do pedido** é o instante da criação em UTC, definido pelo servidor e **truncado em segundos**, porque a coluna `datetime2(0)` arredondaria e 23:59:59.6 viraria o dia seguinte. Filtros de período recebem **datas** (`yyyy-MM-dd`) em UTC entre 2000-01-01 e 2100-12-31, **inclusivas nas duas pontas**, aplicadas como intervalo semiaberto `[dataInicio 00:00, dataFim + 1 dia 00:00)`. | 400 (data fora da faixa) |
-| RN-12 | Na listagem, os filtros são opcionais; se ambos forem informados, `dataInicio ≤ dataFim`. Filtrar por um cliente inexistente retorna lista vazia (não é erro). | 400 |
+| RN-12 | Na listagem, os filtros são opcionais; se ambos forem informados, `dataInicio ≤ dataFim`. O `clienteId`, quando informado, é maior que zero. Filtrar por um cliente que não existe retorna lista vazia (não é erro). | 400 |
 | RN-13 | A listagem é ordenada por `DataPedido` desc e depois `Id` desc. Paginação: `pagina` entre 1 e 1.000.000 (padrão 1), `tamanhoPagina` entre 1 e 100 (padrão 10). Os limites evitam estouro no cálculo do `OFFSET`. | 400 |
 | RN-14 | **Top clientes**: o período é obrigatório. O ranking soma os itens dos pedidos do período **agrupando por cliente (Id, nunca por nome)**, ordena por valor desc com desempate por `ClienteId` asc e retorna até 5. Cliente sem pedido no período não aparece. | 400 |
 
 Ordem de validação: primeiro o **formato** (400: RN-01, 02, 06, 07), depois as **regras que dependem do banco** (422: RN-03, 04, 05, 08). Em 422 a resposta traz um `codigo` estável para o cliente da API tratar.
+
+O domínio (`Pedido.Criar`) repete as regras de formato como invariantes e, se alguma for violada, lança `PEDIDO_INVALIDO` (422). Pela API isso não acontece, porque a validação de formato responde 400 antes: o código protege quem usa o domínio diretamente.
 
 ## 5. API
 
@@ -138,7 +140,7 @@ Base: `http://localhost:8080` (direto) ou `http://localhost:3000/api` (via proxy
 | Status | Quando |
 |---|---|
 | **201 Created** | Pedido criado. Header `Location: /pedidos/{id}` (pelo proxy do frontend, `/api/pedidos/{id}`) e corpo = detalhe do pedido (5.2). |
-| **400 Bad Request** | JSON inválido ou violação de RN-01, 02, 06 ou 07 (`ValidationProblemDetails` com `errors` por campo, ex.: `itens[1].quantidade`). |
+| **400 Bad Request** | JSON inválido; `clienteId` ou `produtoId` ausente ou ≤ 0; item nulo; ou violação de RN-01, 02, 06 ou 07. A resposta é um `ValidationProblemDetails` com `errors` por campo (ex.: `itens[1].quantidade`). |
 | **422 Unprocessable Entity** | Violação de RN-03, 04, 05 ou 08/09. |
 
 ```json
@@ -219,10 +221,12 @@ Sem datas, ou com `dataInicio > dataFim`, retorna `400`.
 **Modal Novo pedido**
 
 - Seleção de cliente.
-- Linhas de item com produto (mostrando preço e estoque) e quantidade. Dá para adicionar e remover linhas, e um produto já escolhido não aparece nas outras linhas.
+- Linhas de item com produto (mostrando preço e estoque) e quantidade. Dá para adicionar e remover linhas. Nas outras linhas, um produto já escolhido aparece desabilitado, assim como os produtos sem estoque.
 - Total estimado calculado na tela; o valor oficial é o que a API devolve.
-- Validação na tela (cliente obrigatório, ao menos 1 item, quantidade ≥ 1). Erros da API (400/422) aparecem no modal com a mensagem do `detail`.
-- No sucesso o modal fecha, a listagem é recarregada e aparece a confirmação "Pedido #N criado".
+- Validação na tela: cliente obrigatório, ao menos 1 item, e quantidade entre 1 e o estoque exibido.
+- A API continua sendo a autoridade. Se o estoque mudar entre a abertura do modal e o envio, o 422 aparece no modal com a mensagem do `detail`, assim como qualquer 400.
+- No sucesso, o modal fecha, a listagem volta para a página 1 e é recarregada, e aparece a confirmação "Pedido #N criado".
+- Os filtros são mantidos: sem filtro, o pedido novo aparece no topo; com um filtro que o exclua, só a confirmação aparece.
 
 ## 7. Requisitos não funcionais
 
@@ -232,7 +236,7 @@ Sem datas, ou com `dataInicio > dataFim`, retorna `400`.
 | RNF-02 | Consultas com predicados *sargable*, paginação no banco (`OFFSET/FETCH`) e índices de suporte (seção 3). O banco usa **RCSI** (`READ_COMMITTED_SNAPSHOT`), para leituras não bloquearem atrás de transações de pedido. |
 | RNF-03 | Credenciais via variáveis de ambiente, com padrões de desenvolvimento no compose. A API usa um login com **privilégio mínimo granular**: `SELECT` no schema, `INSERT` em Pedidos e ItensPedido e `UPDATE` só da coluna `Estoque`. O MCP do Claude usa um login **somente leitura** e roda como serviço HTTP do compose (profile `dev`), exposto apenas em `127.0.0.1`. |
 | RNF-04 | Testes unitários (regras e validações) e testes de integração contra **SQL Server real** (Testcontainers, rodando o mesmo `database/init-db.sh` do compose, com a API conectada pelo login de privilégio mínimo). |
-| RNF-05 | Pipeline de CI (GitHub Actions) a cada push e pull request: build, testes unitários, testes de integração, lint e build do frontend, e um *smoke test* do `docker compose`. |
+| RNF-05 | Pipeline de CI (GitHub Actions) a cada push na `main` e em pull requests: build, testes unitários, testes de integração, lint e build do frontend, e *smoke tests* do `docker compose` e do MCP. A Parte 4 tem workflow próprio, disparado quando `database/` muda. |
 
 ## 8. Critérios de aceite
 
@@ -252,15 +256,15 @@ Sem datas, ou com `dataInicio > dataFim`, retorna `400`.
 | CA-12 | Quando `dataInicio > dataFim`, `pagina < 1` ou `tamanhoPagina` fora de 1–100, recebo `400`. | Unitário + Integração |
 | CA-13 | Quando peço o top clientes de um período, recebo até 5 clientes em ordem decrescente de valor; pedidos fora do período são ignorados e **clientes homônimos aparecem separados**. | Integração |
 | CA-14 | Quando peço o top clientes sem período, recebo `400`. | Integração |
-| CA-15 | Pelo frontend, quando crio um pedido no modal, ele aparece no topo da listagem. | Manual (roteiro no README) |
+| CA-15 | Pelo frontend, sem filtros ativos, quando crio um pedido no modal, ele aparece no topo da listagem. | Manual (roteiro no README) |
 | CA-16 | Em uma máquina só com Docker, `docker compose up` deixa o frontend acessível em `http://localhost:3000` com dados de exemplo. | Manual + CI (smoke do compose) |
 
 ## 9. Premissas e questões em aberto
 
 - **Fuso horário**: datas são gravadas e filtradas em UTC. Para uma operação real num único fuso (ex.: `America/Sao_Paulo`), o próximo passo seria converter os limites do período a partir do fuso de negócio. Isso foi registrado como limitação conhecida.
-- **Dados de exemplo**: a carga usa datas fixas de jan/2025 a out/2026. Assim, um pedido criado agora sempre aparece no topo da listagem (CA-15) e os exemplos do README são reproduzíveis. Datas de fronteira (31/12 23:59:59, 01/01 00:00) ficam só nos testes e na massa da Parte 4.
+- **Dados de exemplo**: a carga usa datas fixas de jan/2025 a out/2026. Assim, um pedido criado agora sempre aparece no topo da listagem (CA-15) e os exemplos do README são reproduzíveis. Datas de fronteira (31/12 23:59:59, 01/01 00:00) ficam só nos testes de integração, que criam os próprios dados.
 - **Volume de clientes e produtos**: os endpoints de apoio devolvem a lista completa, o que é adequado ao volume da demo. Com milhares de registros, o frontend passaria a usar busca paginada (autocomplete).
-- **Relatório e a query da Parte 4**: o endpoint de top clientes e a query corrigida da Parte 4 seguem os mesmos princípios (agrupamento por Id, intervalo semiaberto, índice de cobertura). A análise está no README.
+- **Relatório e a query da Parte 4**: o endpoint de top clientes e a query corrigida da Parte 4 seguem os mesmos princípios (agrupamento por Id, intervalo semiaberto, índice de cobertura). Eles diferem na posição em caso de empate: o endpoint numera de 1 a 5, com desempate pelo menor `ClienteId` (RN-14), e o script usa `RANK()`, que repete a posição. A análise está no README.
 
 ## 10. Rastreabilidade (critério → teste)
 
@@ -282,5 +286,5 @@ Nos testes, cada critério também aparece como `[Trait("CA", "CA-xx")]`, e a bu
 | CA-12 | `ListarPedidosValidatorTests.*` | `ListarPedidosTests.Get_ParametroInvalido_*`, `Get_PaginaAlemDaUltima_*`, `Get_ParametroQueNaoEhNumero_*` |
 | CA-13 | — | `TopClientesTests.Get_DevolveOsCincoMaiores*`, `Get_ClientesHomonimos*`, `Get_IgnoraPedidosForaDoPeriodo*` |
 | CA-14 | `TopClientesValidatorTests.Validar_SemPeriodo_*` | `TopClientesTests.Get_PeriodoAusenteOuInvertido_*` |
-| CA-15 | — | Roteiro manual no README |
+| CA-15 | — | Roteiro manual no README, executado contra um mock da API. Pela API real, o smoke do compose cobre o mesmo fluxo, sem a tela. |
 | CA-16 | — | Job `compose` do CI (`.github/workflows/ci.yml`) |
