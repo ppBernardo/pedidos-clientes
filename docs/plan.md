@@ -28,6 +28,13 @@
 
 ## 2. Revisão crítica do rascunho
 
+**Quem decidiu.**
+- Os pontos vieram do subagente de planejamento.
+- A triagem foi proposta pelo Claude: aceitar ou recusar cada ponto, com o motivo.
+- O humano aprovou a triagem junto com o plano, sem alterações item a item.
+
+As decisões que partiram do humano estão na seção 1.
+
 **Aceito, e o plano mudou por causa disso**:
 
 | Ponto levantado | Ajuste |
@@ -188,11 +195,18 @@ Comparação do plano aprovado com o que de fato aconteceu. O detalhe de cada ep
 | Testes em xUnit v3 (runner não definido) | Microsoft.Testing.Platform, ativado no `global.json` | O xUnit v3 4.x não roda no modo VSTest do SDK 10 |
 | M2/M5/M6 validados localmente; pausa para reiniciar a sessão e usar o MCP | Integração (42 testes), `docker compose up` e MCP validados **no GitHub Actions**, com jobs de smoke test para o compose e o MCP. O **uso interativo do MCP numa sessão local não aconteceu** | A máquina continuou sem Docker até o fim |
 | Skills criadas e usadas em sequência | A `novo-endpoint` só pôde ser usada depois de um reinício da sessão | Skills e subagentes só carregam quando a sessão começa |
-| Parte 4 investigada pelo MCP, em 3 estados (A/B/C), com os `.sqlplan` em `docs/parte4/` | Medição no workflow `parte4.yml`, em **4 estados**. Os números e os operadores dos planos estão no README; os `.sqlplan` ficam como artefato da execução | Sem Docker local. O estado extra (corrigida sem índices) mostrou que a reescrita sozinha não muda o custo |
+| A `novo-endpoint` gera o GET /pedidos e o relatório (§4.1) | Contratos, validadores e portas de listagem, relatório e catálogo saíram com a camada de aplicação (M4), antes da skill. Depois do reinício, ela terminou três fatias: endpoint e testes do GET /pedidos; consulta, endpoint e testes do relatório e do catálogo | A camada de aplicação foi escrita inteira de uma vez, e a skill só nasceu depois do POST /pedidos, como o plano mandava |
+| `settings.json` com lista `allow` para build e testes (§4.1) | Só restrições: hooks e `permissions.deny` | O classificador do modo automático bloqueou o agente de se conceder permissões |
+| Cenário e queries da Parte 4 em `database/perf/` (§4.1) | Em `database/consultas/`; `perf/` ficou só com a medição | O cenário de erros roda no `PedidosDb`, com a carga de exemplo, e não depende do volume |
+| `global.json` em `backend/` (§4.1) | Na raiz do repositório | O `dotnet` procura o `global.json` a partir do diretório atual. Na raiz, o runner de testes vale para os comandos do README rodados de lá |
+| `node --test .claude/hooks` (§4.5) | `node --test ".claude/hooks/**/*.test.mjs"` | No Node 24, um diretório passado ao `--test` é tratado como arquivo |
+| Parte 4 investigada pelo MCP, em 3 estados (A/B/C), com os `.sqlplan` em `docs/parte4/` | Medição no workflow `parte4.yml`, em **4 estados**. Os números e os operadores dos planos estão no README; os `.sqlplan` ficam como artefato da execução, e `docs/parte4/` está no `.gitignore` | Sem Docker local. O estado extra (corrigida sem índices) mostrou que a reescrita sozinha não muda o custo |
+| Diagnóstico nº 5: a FK `ItensPedido.PedidoId` sem índice causa scan + hash join (§4.2) | Com o índice, o join com os itens continua scan + hash join. O ganho veio do índice coberto, mais estreito (7.273 → 4.659 páginas), e do seek em `Pedidos` | Um terço dos itens é de 2026: 400 mil seeks custariam mais que o scan |
+| Datas de fronteira nos testes e na massa da Parte 4 (§2) | Só nos testes de integração | A massa é gerada por aritmética modular. As fronteiras do período são exercitadas pelos testes da listagem e do relatório |
 | Diagnóstico aceito na revisão: "o LEFT JOIN não é causa de lentidão; o otimizador o converte em INNER" | O plano real manteve o `Left Outer Join` e aplicou o `YEAR()` depois do join | A evidência derrubou a premissa, e o README foi corrigido |
 | Frontend verificado em `localhost:3000` com a API real | Verificado no navegador contra um mock que segue o contrato da spec; o fluxo pela API real é coberto pelo smoke test do compose no CI | Sem Docker local |
-| Cerca de 55 commits | 84 commits | Cada correção virou um commit `fix:` próprio, como este plano pedia, e o CI rendeu commits a mais |
-| Subagente `revisor` antes de cada push | Usado antes do primeiro push, que concentrou quase todo o código | Os pushes seguintes foram correções pequenas, validadas pelo CI |
+| Cerca de 55 commits, cada um compilando e com testes verdes (§2) | Cerca de 100, contando a revisão final (o número exato está no `git log`). Duas exceções à regra: o `7a954ff` não compila sozinho, e a integração ficou vermelha em 28 commits (`c42bf97` a `df80e75`) | Correções em código já commitado viraram commits `fix:` próprios, o CI rendeu commits a mais e a revisão final acrescentou outro lote. Sem Docker local, a integração só rodou no CI depois do primeiro push; o histórico não foi reescrito |
+| Subagente `revisor` antes de cada push | Usado antes do primeiro push, que concentrou quase todo o código, e antes do push da revisão final | Os pushes intermediários foram correções pequenas, validadas pelo CI |
 
 ## 6. Retrospectiva
 
@@ -200,9 +214,10 @@ Comparação do plano aprovado com o que de fato aconteceu. O detalhe de cada ep
 - Spec com RN e CA numerados. Ela guiou testes, endpoints e a rastreabilidade sem retrabalho.
 - Ter um plano B para a falta de SDK e de Docker. A ordem mudou e o trabalho não parou.
 - Usar os mesmos scripts SQL no compose e nos testes. A primeira execução real do banco no CI funcionou de primeira.
-- A revisão crítica independente, que evitou cinco problemas antes do código existir.
+- A revisão crítica independente, que pegou problemas reais antes do código existir (seção 2).
 
 **O plano errou ou subestimou:**
 - **A dependência do ambiente.** Validar só no CI funcionou, mas deixou o MCP sem uso interativo, justamente um dos itens avaliados.
 - **Premissas sobre o otimizador.** O plano tratou como fato o que só a medição podia confirmar.
 - **Os testes de integração ficaram muito tempo sem rodar.** Eles foram escritos bem antes da primeira execução, e o bug do relógio de teste só apareceu no CI. Publicar no GitHub mais cedo teria antecipado isso.
+- **Afirmações sobre o próprio processo.** O README chegou a dizer que cada correção virou commit `fix:` próprio, que todo commit compilava e que a skill criou quatro endpoints inteiros. A auditoria final conferiu com o `git log` e corrigiu o texto. Afirmação sobre o processo precisa da mesma evidência que afirmação sobre o código.
