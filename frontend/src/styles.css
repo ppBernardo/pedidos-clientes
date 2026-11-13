@@ -331,6 +331,8 @@ ul.alerta {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* Um fieldset não encolhe abaixo do conteúdo (min-inline-size: min-content). */
+  min-inline-size: 0;
   margin: 0;
   padding: 12px;
   border: 1px solid var(--cor-borda);
@@ -346,11 +348,18 @@ ul.alerta {
   align-self: flex-start;
 }
 
+/* minmax(0, 1fr): a coluna do produto pode ficar mais estreita que a opção mais
+   longa do select, que senão alarga a linha e cria rolagem horizontal no modal. */
 .item {
   display: grid;
-  grid-template-columns: 1fr 110px auto;
+  grid-template-columns: minmax(0, 1fr) 110px auto;
   gap: 8px;
   align-items: end;
+}
+
+.item select {
+  width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 760px) {
@@ -359,7 +368,7 @@ ul.alerta {
   }
 
   .item {
-    grid-template-columns: 1fr 90px;
+    grid-template-columns: minmax(0, 1fr) 90px;
   }
 
   .item__remover {

@@ -195,3 +195,7 @@ Um subagente auditou o repositório inteiro contra o enunciado, só com leitura.
   - **Defeito visual que tinha passado despercebido contra o mock.** A linha de item passa da largura do modal (704 px de conteúdo para 680 px de modal), cria rolagem horizontal e corta o botão Remover.
     - Causa: a coluna `1fr` não encolhe abaixo da opção mais longa do `<select>`, e o `fieldset` não encolhe abaixo do próprio conteúdo.
     - A correção foi testada injetando CSS só na aba do Claude, e a rolagem sumiu.
+    - **Corrigido** (`fix:`): `minmax(0, 1fr)` na coluna do produto, `min-inline-size: 0` no `fieldset` e `select` com `width: 100%`.
+    - Conferido numa reprodução do modal servida localmente, com o CSS antigo e o novo:
+      - no desktop, o conteúdo caiu de 704 px para 680 px, a largura do modal;
+      - no celular, onde o defeito era bem pior, caiu de 586 px para 339 px.

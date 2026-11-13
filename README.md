@@ -61,7 +61,7 @@ O roteiro foi executado duas vezes, pelo Claude no navegador.
 
   Pela API, o detalhe do pedido conferiu, o estoque do teclado e do mouse baixou uma unidade, e o da placa de vídeo continuou em 2.
 
-  A mesma execução achou um defeito visual: a linha de item do modal passa da largura dele e cria rolagem horizontal.
+  A mesma execução achou um defeito visual: a linha de item do modal passava da largura dele e criava rolagem horizontal, pior no celular. Ele foi corrigido em seguida.
 
 A cada push, o job `compose` do CI faz o mesmo fluxo pela API (listar, criar e ver no topo), sem a tela.
 
@@ -247,6 +247,7 @@ flowchart LR
 | Um commit intermediário não compila sozinho: o registro de DI entrou antes das consultas. | **Não** foi reescrito, porque o histórico é preservado; está registrado no diário |
 | Subagente revisor com 2 falsos positivos. | Conferidos no código e descartados |
 | Script de medição da Parte 4 com `sqlcmd -y 0 -h -1`, combinação que o sqlcmd recusa. A 1ª execução falhou. | Removido o `-h` |
+| Modal de novo pedido com rolagem horizontal: a caixa de produto assumia a largura da opção mais longa. Foi achado ao rodar o CA-15 contra a API real. | `minmax(0, 1fr)` no grid e `fieldset` que encolhe; conferido em desktop e celular |
 | **Afirmações minhas desmentidas pela evidência:** "o otimizador converte o LEFT JOIN em INNER" (o plano real mostrou que não), "o `explain_sql` não funciona no SQL Server" (funciona) e "o modal mostra o 422 ao pedir acima do estoque" (a tela barra antes). | README e diário corrigidos com o que foi medido e observado |
 | **Afirmações do próprio README que o `git log` desmentiu**, achadas na revisão final: "cada correção virou um commit `fix:` próprio", "cada commit compila" e "a skill `novo-endpoint` criou os quatro endpoints". | Texto reescrito com o que os commits mostram |
 
