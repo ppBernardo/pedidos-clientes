@@ -45,11 +45,14 @@ Os scripts são idempotentes, então rodar `up` de novo não duplica nada. Não 
 
 **Roteiro de verificação manual (CA-15)**
 1. Abra http://localhost:3000. A primeira página mostra os 10 pedidos mais recentes de um total de 1.500.
-2. Filtre por um cliente e por um período, e use a paginação.
+2. Filtre por um cliente e por um período, e use a paginação. Depois clique em **Limpar**.
 3. Clique em **Novo pedido** e escolha um cliente e dois produtos.
    - Pedir mais do que o estoque de "Placa de vídeo RTX" (2 unidades) é barrado na própria tela, com a mensagem do item.
    - A API devolve 422 nesse mesmo caso, se o estoque mudar entre o carregamento da tela e o envio; o erro dela aparece no modal.
 4. Crie o pedido. O modal fecha, aparece "Pedido #N criado" e o pedido novo fica **destacado no topo** da listagem.
+   - Os filtros são mantidos depois de criar: com um filtro que exclua o pedido novo, só a confirmação aparece.
+
+Nesta entrega, o roteiro foi executado no navegador contra um mock da API que segue o contrato da spec, porque a máquina de desenvolvimento não tinha Docker. Contra a API real, o job `compose` do CI faz o mesmo fluxo pela API (listar, criar e ver no topo), sem a tela.
 
 **Problemas comuns**
 - **Mudou `SA_PASSWORD` depois do primeiro `up`?** O volume guarda a senha antiga. Rode `docker compose down -v` para recriar o banco do zero.
@@ -76,14 +79,17 @@ Como funcionam os **testes de integração**:
 - O banco é limpo antes de cada teste, e cada teste cria os próprios dados.
 - Destaques: 20 POSTs simultâneos para estoque 5 (exatamente 5 criados e estoque 0), pedidos em ordem cruzada sem deadlock, rollback no repositório, limites de período (23:59:59) e o ranking com homônimos.
 
-**CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): roda a cada push e pull request, com estes jobs:
+**CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): roda a cada push na `main` e em todo pull request, com estes jobs:
 
 | Job | O que faz |
 |---|---|
 | hooks | Testes dos scripts dos hooks |
 | backend | Build com warnings como erro, testes unitários e de integração |
 | frontend | Lint e build |
-| compose | Sobe tudo com `docker compose up --build`, sem `.env`, e faz um fluxo real pelo proxy do frontend: lista, cria, confere o topo, relatório e 422 |
+| compose | Sobe tudo com `docker compose up --build`, sem `.env`, e faz um fluxo real pelo proxy do frontend: lista, cria, segue o `Location`, confere o topo, relatório e 422 |
+| mcp | Sobe o banco e o DBHub (profile `dev`) e conversa com ele como o Claude Code: handshake, ferramentas, uma leitura e um `DELETE` recusado |
+
+A Parte 4 tem um workflow próprio, [`parte4.yml`](.github/workflows/parte4.yml), que roda quando `database/` muda ou sob demanda: cenário de erros e medição em 4 estados.
 
 A rastreabilidade de cada critério de aceite até o teste está na [seção 10 da spec](docs/spec.md#10-rastreabilidade-critério--teste).
 
@@ -166,9 +172,14 @@ flowchart LR
 2. **Plan mode.**
    - O Claude checou as versões atuais no npm e no NuGet, em vez de confiar na memória.
    - Um subagente confirmou na documentação o formato de hooks, skills e MCP.
-   - **Outro subagente fez uma revisão crítica independente do rascunho.** Ela achou 5 problemas reais, como um pedido de exemplo com data futura que apareceria acima dos pedidos novos e o arredondamento do `datetime2(0)`.
+   - **Outro subagente fez uma revisão crítica independente do rascunho.** Dos 17 pontos dela registrados na seção 2 do plano, 14 mudaram o plano e 3 foram recusados com motivo. Entre eles havia problemas reais que o rascunho tinha deixado passar, como um pedido de exemplo com data futura, que apareceria acima dos pedidos novos, e o arredondamento do `datetime2(0)`.
 3. **Decisões humanas registradas no plano**, com motivo: .NET 10, React, diferenciais escolhidos e conta do GitHub. A spec virou v1.0 com os ajustes.
-4. **Implementação em commits pequenos**, cada um compilando, em Conventional Commits em português. Cada correção em código gerado virou um commit `fix:` próprio e uma entrada no [diário](docs/diario-claude.md).
+4. **Implementação em commits pequenos**, em Conventional Commits em português.
+   - A regra era cada commit compilar e ter testes verdes. Ficaram duas exceções conhecidas no histórico, que não foi reescrito:
+     - o `7a954ff` não compila sozinho;
+     - a suíte de integração, que só rodava no CI, ficou vermelha em 28 commits, de `c42bf97` até a correção em `df80e75`.
+   - Correções em código já commitado viraram commits `fix:` próprios. Um deles saiu como `refactor:` (`8d2178b`).
+   - Erros que o hook pegou antes do commit não geraram commit; ficaram registrados no [diário](docs/diario-claude.md).
 
 ### Configuração versionada (`CLAUDE.md` e `.claude/`)
 
@@ -177,9 +188,9 @@ flowchart LR
 | **Rules** | [`CLAUDE.md`](CLAUDE.md) e [`.claude/rules/`](.claude/rules) | O CLAUDE.md curto traz arquitetura, comandos, nomenclatura e armadilhas do ambiente. As regras por área (backend, frontend, banco e testes) carregam pelo caminho do arquivo editado (`paths:`). |
 | **Hook de verificação** | [`verificar-apos-edicao.mjs`](.claude/hooks/verificar-apos-edicao.mjs) | `PostToolUse` em `Edit\|Write`: `dotnet build` do projeto editado, ou `tsc -b` + oxlint no frontend. O erro volta para o Claude na hora. Pegou erros reais de compilação no código gerado, inclusive o mesmo erro repetido duas vezes. |
 | **Hook de histórico** | [`bloquear-reescrita-git.mjs`](.claude/hooks/bloquear-reescrita-git.mjs) | `PreToolUse` em `Bash\|PowerShell`: bloqueia rebase, amend, push forçado e reset que move o branch, porque o desafio exige histórico preservado. Tem 47 testes e foi testado ao vivo nas duas ferramentas. |
-| **Skill `novo-endpoint`** | [`.claude/skills/novo-endpoint`](.claude/skills/novo-endpoint) | Roteiro do padrão do projeto (spec → contrato → porta → implementação → endpoint → testes), extraído do `POST /pedidos`. **Usada de verdade** para criar `GET /pedidos`, `GET /relatorios/top-clientes`, `GET /clientes` e `GET /produtos`. |
+| **Skill `novo-endpoint`** | [`.claude/skills/novo-endpoint`](.claude/skills/novo-endpoint) | Roteiro do padrão do projeto (spec → contrato → porta → implementação → endpoint → testes), extraído do `POST /pedidos`. Usada depois de um reinício da sessão para terminar três fatias: `GET /pedidos` (faltavam o endpoint e os testes de integração), `GET /relatorios/top-clientes` e `GET /clientes` + `GET /produtos` (consulta, endpoint e testes). Os contratos, validadores e portas dessas fatias já existiam: foram escritos com a camada de aplicação, antes da skill. |
 | **Skill `analisar-query`** | [`.claude/skills/analisar-query`](.claude/skills/analisar-query) | Roteiro de investigação de SQL: corretude, inspeção pelo MCP, medição com `sqlcmd` e comparação da original e da corrigida, com e sem índices. Traz consultas prontas de Query Store e DMVs. |
-| **Subagente `revisor`** | [`.claude/agents/revisor.md`](.claude/agents/revisor.md) | Revisa os commits não publicados contra spec, CLAUDE.md e rules. Usado antes do push: de 6 apontamentos, 2 viraram `fix:` e 2 foram **descartados depois de conferidos**, porque eram falsos. |
+| **Subagente `revisor`** | [`.claude/agents/revisor.md`](.claude/agents/revisor.md) | Revisa os commits não publicados contra spec, CLAUDE.md e rules. Usado antes do primeiro push: 2 apontamentos viraram `fix:`, 2 foram **descartados depois de conferidos**, porque eram falsos, e 1 sugestão foi recusada porque não compila no xUnit 4. Usado de novo antes do push da revisão final: achou 1 problema real, e a correção que ele sugeriu não funcionaria. |
 | **MCP SQL Server** | [`.mcp.json`](.mcp.json) e [`database/mcp/dbhub.toml`](database/mcp/dbhub.toml) | DBHub rodando como serviço HTTP do compose (profile `dev`). Fica igual em Windows, macOS e Linux, sem o `cmd /c npx` que o stdio exigiria no Windows. É somente leitura em duas camadas: o `readonly` do DBHub e o login `mcp_leitura`, que é a barreira real. |
 
 **Como o MCP é usado.**
@@ -222,6 +233,7 @@ flowchart LR
 | Subagente revisor com 2 falsos positivos. | Conferidos no código e descartados |
 | Script de medição da Parte 4 com `sqlcmd -y 0 -h -1`, combinação que o sqlcmd recusa. A 1ª execução falhou. | Removido o `-h` |
 | **Afirmações minhas desmentidas pela evidência:** "o otimizador converte o LEFT JOIN em INNER" (o plano real mostrou que não), "o `explain_sql` não funciona no SQL Server" (funciona) e "o modal mostra o 422 ao pedir acima do estoque" (a tela barra antes). | README e diário corrigidos com o que foi medido e observado |
+| **Afirmações do próprio README que o `git log` desmentiu**, achadas na revisão final: "cada correção virou um commit `fix:` próprio", "cada commit compila" e "a skill `novo-endpoint` criou os quatro endpoints". | Texto reescrito com o que os commits mostram |
 
 **Limites do Claude Code encontrados.**
 - O modo automático **bloqueou** a tentativa do agente de se dar permissões (uma lista `allow` no `settings.json`). Por isso o `settings.json` versionado só restringe.
@@ -264,7 +276,10 @@ O cenário [`database/consultas/cenario-erros.sql`](database/consultas/cenario-e
 - **`YEAR(p.DataPedido) = 2026` não é sargable.** Mesmo com `IX_Pedidos_DataPedido`, o plano da original faz **Index Scan dos 400 mil pedidos** e aplica a função linha a linha. A corrigida faz **Index Seek** só nos 132.964 de 2026.
 - **O `YEAR()` também atrapalha as estimativas.** A original estimou 114.789 pedidos em 2026 (eram 132.964) e 120.000 itens (eram 398.919). A corrigida estimou 132.942 contra 132.964 reais.
 - **O LEFT JOIN não virou INNER.** Eu esperava que o otimizador convertesse o join, já que o `WHERE` rejeita NULL. O plano real mostrou outra coisa: `Hash Match (Left Outer Join)` entre os 20 mil clientes e **todos** os 400 mil pedidos, e só depois o `Filter` do `YEAR()`. Com a função em volta da coluna, ele não empurrou o filtro para antes do join. Neste volume o custo extra foi pequeno, porque o que domina é ler as tabelas, mas a premissa não se confirmou.
-- **FKs sem índice.** O SQL Server não cria índice para FK. Sem índice em `ItensPedido.PedidoId`, o join com a maior tabela é sempre *scan* + *hash join* da tabela inteira.
+- **Índices de suporte ausentes.** Sem os de `03-indices.sql`, as duas queries leem as tabelas pelo índice clusterizado inteiro.
+  - Com eles, a leitura dos itens cai de 7.273 para 4.659 páginas, porque o índice coberto `UX_ItensPedido_PedidoId_ProdutoId` é mais estreito que a tabela.
+  - O join com os itens continua *scan* + *hash join*: um terço dos itens é de 2026, e 400 mil seeks custariam mais.
+  - O índice da FK `ItensPedido.PedidoId` serve para buscar os itens de um pedido (detalhe e listagem), não para este ranking anual.
 - **Agrupamento por `NVARCHAR(150)`.** Além de errado, junta **20.000 clientes em 2.000 grupos** no `Hash Match (Aggregate)`, porque a massa repete os nomes.
 
 ### A query corrigida
@@ -297,7 +312,9 @@ ORDER BY t.Total DESC, c.Id;
 - **Pré-agrega os itens por `ClienteId`** e só junta `Clientes`, para o nome, nas linhas do resultado.
   - Os itens são lidos pelo índice coberto `UX_ItensPedido_PedidoId_ProdutoId INCLUDE (Quantidade, PrecoUnitario)`, sem lookup.
   - A chave do agrupamento é um inteiro.
-- O endpoint `GET /relatorios/top-clientes` usa **a mesma SQL**, parametrizada e com `TOP (5)` e `COUNT(DISTINCT)` de pedidos. Os testes de integração dele reproduzem os cenários que quebram a query original.
+- O endpoint `GET /relatorios/top-clientes` usa a mesma estrutura (pré-agregação por `ClienteId` no intervalo semiaberto e `Clientes` só no fim), parametrizada, com `TOP (5)` e `COUNT(DISTINCT)` de pedidos.
+  - A diferença está na posição: o endpoint numera de 1 a 5 em C#, com desempate pelo menor `ClienteId` (RN-14), e o script usa `RANK()`, que repete a posição em caso de empate.
+  - Os testes de integração do endpoint reproduzem os cenários que quebram a query original.
 
 ### Como investiguei
 
@@ -331,7 +348,7 @@ Roteiro da skill [`analisar-query`](.claude/skills/analisar-query/SKILL.md):
 - **Com índices, só a query corrigida faz seek** (3 → 4): a leitura de `Pedidos` cai de 1.048 para 335 páginas. Do estado 1 ao 4, as leituras caem 42% e a CPU 45%.
 - **O que sobra é ler os itens.** Um terço deles é de 2026, então o otimizador escolhe scan do índice coberto + hash join, que é mais barato que 400 mil seeks.
   - O próximo passo, se esse ranking fosse crítico, seria materializar o total, com uma view indexada por pedido e dia ou um `ValorTotal` em `Pedidos`. A spec optou por não fazer isso, para ter uma fonte única da verdade.
-  - Com períodos menores (um mês, por exemplo), o ganho do seek cresce na mesma proporção.
+  - Hipótese **não medida**: com períodos menores (um mês, por exemplo), a vantagem do seek deve crescer, porque a parte lida de `Pedidos` encolhe junto com o período.
 - **O ganho mais importante desta query é de corretude:** o ranking original estava errado.
 
 Para reproduzir, com o compose no ar:
@@ -342,6 +359,8 @@ MSYS_NO_PATHCONV=1 docker compose run --rm --user root -v ./docs/parte4:/saida -
 
 ## O que ficou de fora
 
-- **Diferenciais não escolhidos:** testes E2E com Playwright (o CA-15 é coberto pelo roteiro manual e o CA-16 pelo smoke test do compose no CI), painel de top clientes no frontend e deploy online.
+- **Diferenciais não escolhidos:** testes E2E com Playwright, painel de top clientes no frontend e deploy online.
+  - O CA-16 é coberto pelo smoke test do compose no CI.
+  - O CA-15 tem roteiro manual, executado só contra um mock da API. Um teste Playwright no job `compose` fecharia essa lacuna.
 - **Fuso de negócio:** para operar em `America/Sao_Paulo`, os limites do período seriam convertidos a partir desse fuso.
 - **Busca paginada** de clientes e produtos, se o volume crescer.
