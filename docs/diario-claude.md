@@ -149,3 +149,7 @@ Um subagente auditou o repositório inteiro contra o enunciado, só com leitura.
 - **Comando de medição da skill `analisar-query` que não funcionava** (`fix:`).
   - Ele usava `docker compose exec` no serviço `sqlserver`, que não monta `database/`, e expandia `$SA_PASSWORD` no host, onde a variável não existe.
   - Trocado pela forma que o `parte4.yml` já usa: o serviço `db-init`, que tem o sqlcmd, a pasta montada e a senha no ambiente.
+- **O MCP não alcançava o banco da Parte 4** (`fix:`).
+  - O `run-perf.sh` não criava os usuários no `PedidosPerf`. Mesmo com Docker, o roteiro de inspeção da skill só enxergaria os 1.500 pedidos do `PedidosDb`.
+  - Agora o script cria os usuários, e o MCP lê o `PedidosPerf` com nomes de três partes (`PedidosPerf.dbo.Pedidos`).
+  - O `parte4.yml` passou a conferir isso pelo próprio DBHub: a contagem e o Query Store da medição.

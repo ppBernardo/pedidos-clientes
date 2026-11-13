@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   medir:
-    name: Cenário de erros e medição (A/B/C/D)
+    name: Cenário de erros e medição (4 estados)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -82,6 +82,53 @@ jobs:
           name: parte4-planos-e-estatisticas
           path: docs/parte4/
 
+      # O MCP do Claude Code (DBHub, login mcp_leitura) conecta no PedidosDb e lê o
+      # banco da medição com nomes de três partes: a contagem e o Query Store.
+      - name: MCP lendo o banco da medição (PedidosPerf)
+        run: |
+          set -euo pipefail
+          docker compose --profile dev up -d mcp-sqlserver
+          for tentativa in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8090/healthz; then break; fi
+            if [ "$tentativa" -eq 60 ]; then echo "O DBHub não subiu a tempo."; exit 1; fi
+            sleep 3
+          done
+          url=http://127.0.0.1:8090/mcp
+          cabecalhos=(-H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream')
+          curl -sS -o /dev/null -D sessao.txt "${cabecalhos[@]}" "$url" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}'
+          id_sessao=$(grep -i '^mcp-session-id:' sessao.txt | cut -d' ' -f2 | tr -d '\r' || true)
+          if [ -n "$id_sessao" ]; then cabecalhos+=(-H "Mcp-Session-Id: $id_sessao"); fi
+          mcp() { curl -sS "${cabecalhos[@]}" "$url" -d "$1"; echo; }
+          execute_sql() {
+            jq -cn --arg sql "$2" --argjson id "$1" \
+              '{jsonrpc: "2.0", id: $id, method: "tools/call", params: {name: "execute_sql", arguments: {sql: $sql}}}'
+          }
+          mcp '{"jsonrpc":"2.0","method":"notifications/initialized"}' > /dev/null
+          mcp "$(execute_sql 2 'SELECT COUNT(*) AS pedidos FROM PedidosPerf.dbo.Pedidos')" | tee contagem.txt
+          grep -q 400000 contagem.txt
+          mcp "$(execute_sql 3 "SELECT TOP (6) rs.count_executions AS execucoes,
+                 CAST(rs.avg_logical_io_reads AS BIGINT) AS leituras_media,
+                 CAST(rs.avg_cpu_time / 1000.0 AS DECIMAL(12, 2)) AS cpu_ms_media,
+                 LEFT(qt.query_sql_text, 90) AS consulta
+               FROM PedidosPerf.sys.query_store_query_text AS qt
+               JOIN PedidosPerf.sys.query_store_query AS q ON q.query_text_id = qt.query_text_id
+               JOIN PedidosPerf.sys.query_store_plan AS p ON p.query_id = q.query_id
+               JOIN PedidosPerf.sys.query_store_runtime_stats AS rs ON rs.plan_id = p.plan_id
+               WHERE qt.query_sql_text LIKE N'%GROUP BY%'
+               ORDER BY rs.avg_logical_io_reads DESC")" | tee query-store.txt
+          {
+            echo "### MCP (DBHub, login mcp_leitura) lendo o PedidosPerf"
+            echo
+            echo '```'
+            cat contagem.txt query-store.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Logs do DBHub
+        if: failure()
+        run: docker compose --profile dev logs mcp-sqlserver
+
       - name: Derruba o ambiente
         if: always()
-        run: docker compose down -v
+        run: docker compose --profile dev down -v

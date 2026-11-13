@@ -1,6 +1,10 @@
 -- Consultas de diagnóstico para rodar pelo MCP (execute_sql), todas somente leitura.
 -- O login mcp_leitura tem VIEW DATABASE PERFORMANCE STATE (Query Store) e
 -- VIEW SERVER PERFORMANCE STATE (DMVs de plano e de índices ausentes).
+--
+-- O MCP conecta no PedidosDb. Para o banco da Parte 4 (PedidosPerf), prefixe as
+-- visões com o nome do banco (PedidosPerf.sys.query_store_plan, PedidosPerf.sys.indexes),
+-- troque DB_ID() por DB_ID(N'PedidosPerf') e use OBJECT_ID(N'PedidosPerf.dbo.Pedidos').
 
 -- 1) Consultas que mais leem, segundo o Query Store (troque o filtro de texto).
 SELECT TOP (10)

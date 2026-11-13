@@ -15,6 +15,9 @@ DB_HOST="${DB_HOST:-sqlserver}"
 DB=PedidosPerf
 SAIDA="${SAIDA:-/saida}"
 : "${SA_PASSWORD:?Defina SA_PASSWORD}"
+# O 04-seguranca.sql lê as senhas dos logins do ambiente (as mesmas do db-init).
+export APP_DB_PASSWORD="${APP_DB_PASSWORD:-Pedidos2026App}"
+export MCP_DB_PASSWORD="${MCP_DB_PASSWORD:-Pedidos2026Mcp}"
 
 PERF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(dirname "$PERF")"
@@ -30,6 +33,12 @@ echo ">> Banco $DB com as tabelas, ainda sem os índices de suporte"
 sql -d master -i "$RAIZ/01-criar-banco.sql" -v DB_NAME="$DB"
 sql -d "$DB" -i "$RAIZ/02-tabelas.sql"
 sql -d "$DB" -i "$PERF/remover-indices.sql"
+
+# Os logins do PedidosDb ganham usuário aqui também. Assim o MCP (login
+# mcp_leitura, conectado ao PedidosDb) lê este banco com nomes de três partes,
+# como PedidosPerf.dbo.Pedidos e PedidosPerf.sys.query_store_plan.
+echo ">> Usuários de leitura no $DB (para o MCP inspecionar a Parte 4)"
+sql -d "$DB" -i "$RAIZ/04-seguranca.sql" -v DB_NAME="$DB"
 
 echo ">> Gerando volume (pode levar alguns minutos na primeira vez)"
 sql -d "$DB" -i "$PERF/01-gerar-volume.sql"

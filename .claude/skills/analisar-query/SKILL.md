@@ -35,6 +35,11 @@ Prove cada hipótese com dados:
   - planos e leituras médias no Query Store;
   - índices ausentes sugeridos pelo otimizador;
   - estrutura dos índices.
+- O MCP conecta no `PedidosDb`. Para o banco da Parte 4, use nomes de três partes:
+  - `PedidosPerf.dbo.Pedidos`, `PedidosPerf.sys.query_store_plan`;
+  - `DB_ID(N'PedidosPerf')` no lugar de `DB_ID()`.
+
+  O `run-perf.sh` cria o usuário `mcp_leitura` lá também. O `search_objects` só enxerga o `PedidosDb`, que tem o mesmo schema.
 - O MCP **nunca** altera o banco (o login `mcp_leitura` nem consegue). Índice ou correção vai em script versionado e passa por revisão.
 
 ## 3. Medir (sqlcmd como admin, cache quente)
