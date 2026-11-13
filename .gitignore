@@ -38,3 +38,7 @@ Thumbs.db
 
 # Claude Code: configurações pessoais (as do projeto ficam em .claude/settings.json)
 .claude/settings.local.json
+
+# Saída local da medição da Parte 4 (database/perf/run-perf.sh). No CI, ela vira
+# artefato do workflow parte4.yml, e os números medidos estão no README.
+docs/parte4/
