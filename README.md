@@ -47,7 +47,8 @@ Os scripts são idempotentes, então rodar `up` de novo não duplica nada. Não 
 1. Abra http://localhost:3000. A primeira página mostra os 10 pedidos mais recentes de um total de 1.500.
 2. Filtre por um cliente e por um período, e use a paginação.
 3. Clique em **Novo pedido** e escolha um cliente e dois produtos.
-   - Pedir mais do que o estoque de "Placa de vídeo RTX" (2 unidades) mostra o erro 422 da API dentro do modal.
+   - Pedir mais do que o estoque de "Placa de vídeo RTX" (2 unidades) é barrado na própria tela, com a mensagem do item.
+   - A API devolve 422 nesse mesmo caso, se o estoque mudar entre o carregamento da tela e o envio; o erro dela aparece no modal.
 4. Crie o pedido. O modal fecha, aparece "Pedido #N criado" e o pedido novo fica **destacado no topo** da listagem.
 
 **Problemas comuns**
