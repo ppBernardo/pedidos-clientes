@@ -116,3 +116,24 @@ Registro cronológico de como o Claude Code foi usado neste projeto: o que funci
   - Hooks, frontend, build com warnings como erro e testes unitários.
   - **42 de 42 testes de integração** contra SQL Server real (33 s), incluindo os 20 pedidos simultâneos para estoque 5, a ordem cruzada sem deadlock e as permissões dos logins.
   - **Smoke test do `docker compose up --build`** numa máquina limpa, sem `.env`: subiu em 1 min. O fluxo pelo proxy do frontend passou: 1.500 pedidos, POST no topo da listagem, ranking com 5 clientes e 422 sem estoque.
+
+## 2026-11-12: MCP validado, Parte 4 medida e frontend conferido no navegador
+
+- **MCP validado no CI.** Sem Docker local, o Claude criou um smoke test que conversa com o DBHub como o Claude Code faria. O log mostrou:
+  - handshake com o protocolo `2025-06-18`;
+  - as 3 ferramentas (`execute_sql`, `search_objects` e `explain_sql`);
+  - uma leitura com `success: true`;
+  - o `DELETE` **recusado pelo próprio DBHub** ("Read-only..."), com a contagem no banco intacta.
+
+  **Suposição errada corrigida:** o diário dizia que o `explain_sql` provavelmente não funcionaria no SQL Server. Funciona, e devolve o plano estimado em XML.
+- **Parte 4 rodada de verdade**, num workflow próprio:
+  - **1ª tentativa falhou** por um erro do script gerado: o `sqlcmd` não aceita `-y 0` junto com `-h -1`. Corrigido num `fix:`.
+  - **Cenário de erros com dados reais**: a original mostrou `NULL` no topo, ordem crescente, as duas "Maria Silva" fundidas (401.709,50 = 300.307,40 + 101.402,10) e "Ana Souza" somada com "ANA SOUZA " pela collation.
+  - **Medição em 4 estados** sobre 400 mil pedidos e 1,2 milhão de itens. A conclusão foi mais modesta que um "antes e depois" de marketing: sem índice, a reescrita não muda as leituras; com índice, só a corrigida faz seek em `Pedidos`. Os itens continuam lidos por inteiro, porque um terço deles é de 2026.
+  - **Segunda afirmação errada corrigida pela evidência.** O README dizia que o otimizador converteria o LEFT JOIN em INNER. O plano real mostrou `Hash Match (Left Outer Join)` seguido de `Filter`: com `YEAR()` na coluna, o filtro ficou depois do join. O README foi corrigido.
+  - O `GROUP BY Nome` apareceu em escala no plano: **2.000 grupos para 20.000 clientes**.
+- **Frontend conferido no navegador** contra um mock descartável que segue o contrato da spec (sem Docker não havia API real local). Funcionaram listagem, paginação, filtro por cliente, período invertido barrado na tela, modal com total estimado e validação de estoque, criação com aviso e destaque no topo, e datas no fuso local.
+
+  A verificação achou um erro no README: o roteiro dizia que pedir acima do estoque mostraria o 422 da API, mas a tela barra antes.
+
+  Na automação do navegador, inputs disparados rápido demais se perdiam entre re-renders do React. Era problema do teste, não do código, e foi confirmado antes de mexer em qualquer coisa.
