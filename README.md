@@ -52,7 +52,18 @@ Os scripts são idempotentes, então rodar `up` de novo não duplica nada. Não 
 4. Crie o pedido. O modal fecha, aparece "Pedido #N criado" e o pedido novo fica **destacado no topo** da listagem.
    - Os filtros são mantidos depois de criar: com um filtro que exclua o pedido novo, só a confirmação aparece.
 
-Nesta entrega, o roteiro foi executado no navegador contra um mock da API que segue o contrato da spec, porque a máquina de desenvolvimento não tinha Docker. Contra a API real, o job `compose` do CI faz o mesmo fluxo pela API (listar, criar e ver no topo), sem a tela.
+O roteiro foi executado duas vezes, pelo Claude no navegador.
+- A primeira foi contra um mock da API que segue o contrato da spec, porque a máquina de desenvolvimento não tinha Docker.
+- A segunda foi **contra a API real, num GitHub Codespace** (13/11/2026), e os quatro passos passaram:
+  - o filtro por cliente e período trouxe os 60 pedidos da Ana Souza de janeiro a outubro de 2026, em 6 páginas;
+  - pedir 3 placas de vídeo foi barrado na tela;
+  - o pedido #1501 (teclado e mouse, R$ 579,80) apareceu destacado no topo.
+
+  Pela API, o detalhe do pedido conferiu, o estoque do teclado e do mouse baixou uma unidade, e o da placa de vídeo continuou em 2.
+
+  A mesma execução achou um defeito visual: a linha de item do modal passa da largura dele e cria rolagem horizontal.
+
+A cada push, o job `compose` do CI faz o mesmo fluxo pela API (listar, criar e ver no topo), sem a tela.
 
 **Problemas comuns**
 - **Mudou `SA_PASSWORD` depois do primeiro `up`?** O volume guarda a senha antiga. Rode `docker compose down -v` para recriar o banco do zero.
@@ -365,6 +376,6 @@ MSYS_NO_PATHCONV=1 docker compose run --rm --user root -v ./docs/parte4:/saida -
 
 - **Diferenciais não escolhidos:** testes E2E com Playwright, painel de top clientes no frontend e deploy online.
   - O CA-16 é coberto pelo smoke test do compose no CI.
-  - O CA-15 tem roteiro manual, executado só contra um mock da API. Um teste Playwright no job `compose` fecharia essa lacuna.
+  - O CA-15 tem roteiro manual, executado contra a API real num Codespace. Sem Playwright, a tela não é testada a cada push.
 - **Fuso de negócio:** para operar em `America/Sao_Paulo`, os limites do período seriam convertidos a partir desse fuso.
 - **Busca paginada** de clientes e produtos, se o volume crescer.

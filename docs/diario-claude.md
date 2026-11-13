@@ -182,3 +182,16 @@ Um subagente auditou o repositório inteiro contra o enunciado, só com leitura.
   - "cada commit compila": o `7a954ff` não compila, e a integração ficou vermelha em 28 commits;
   - "a skill criou os quatro endpoints".
 - **Spec alinhada ao código (v1.1).** Validações de id, `PEDIDO_INVALIDO`, comportamento do modal e filtros mantidos depois de criar. O roteiro do CA-15 seguido à risca falharia, porque filtrava e depois esperava o pedido novo no topo.
+- **CA-15 contra a API real, num GitHub Codespace.** O usuário subiu o `docker compose` num Codespace, e o Claude executou o roteiro do README pelo Chrome do usuário (Claude in Chrome).
+  - **Os quatro passos passaram:**
+    - listagem com 1.500 pedidos;
+    - filtro por cliente e período, com paginação (60 pedidos em 6 páginas), e depois **Limpar**;
+    - 3 placas de vídeo barradas na tela;
+    - pedido #1501 criado e destacado no topo.
+  - **Conferido pela API, pelo proxy:**
+    - o detalhe do pedido, com a data em UTC truncada (`17:24:21Z`), que a tela mostra como 14:24 no fuso do navegador;
+    - a baixa de estoque: teclado de 120 para 119, mouse de 200 para 199, e a placa seguiu com 2.
+  - **Pelo DOM:** na segunda linha, a placa já escolhida e o monitor sem estoque aparecem desabilitados, como diz a spec v1.1.
+  - **Defeito visual que tinha passado despercebido contra o mock.** A linha de item passa da largura do modal (704 px de conteúdo para 680 px de modal), cria rolagem horizontal e corta o botão Remover.
+    - Causa: a coluna `1fr` não encolhe abaixo da opção mais longa do `<select>`, e o `fieldset` não encolhe abaixo do próprio conteúdo.
+    - A correção foi testada injetando CSS só na aba do Claude, e a rolagem sumiu.

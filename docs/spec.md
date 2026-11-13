@@ -286,5 +286,5 @@ Nos testes, cada critério também aparece como `[Trait("CA", "CA-xx")]`, e a bu
 | CA-12 | `ListarPedidosValidatorTests.*` | `ListarPedidosTests.Get_ParametroInvalido_*`, `Get_PaginaAlemDaUltima_*`, `Get_ParametroQueNaoEhNumero_*` |
 | CA-13 | — | `TopClientesTests.Get_DevolveOsCincoMaiores*`, `Get_ClientesHomonimos*`, `Get_IgnoraPedidosForaDoPeriodo*` |
 | CA-14 | `TopClientesValidatorTests.Validar_SemPeriodo_*` | `TopClientesTests.Get_PeriodoAusenteOuInvertido_*` |
-| CA-15 | — | Roteiro manual no README, executado contra um mock da API. Pela API real, o smoke do compose cobre o mesmo fluxo, sem a tela. |
+| CA-15 | — | Roteiro manual no README, executado contra a API real num GitHub Codespace (13/11/2026) e, antes, contra um mock. O smoke do compose cobre o mesmo fluxo pela API a cada push, sem a tela. |
 | CA-16 | — | Job `compose` do CI (`.github/workflows/ci.yml`) |
