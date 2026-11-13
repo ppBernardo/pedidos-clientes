@@ -89,7 +89,7 @@ Como funcionam os **testes de integração**:
 | compose | Sobe tudo com `docker compose up --build`, sem `.env`, e faz um fluxo real pelo proxy do frontend: lista, cria, segue o `Location`, confere o topo, relatório e 422 |
 | mcp | Sobe o banco e o DBHub (profile `dev`) e conversa com ele como o Claude Code: handshake, ferramentas, uma leitura e um `DELETE` recusado |
 
-A Parte 4 tem um workflow próprio, [`parte4.yml`](.github/workflows/parte4.yml), que roda quando `database/` muda ou sob demanda: cenário de erros e medição em 4 estados.
+A Parte 4 tem um workflow próprio, [`parte4.yml`](.github/workflows/parte4.yml), que roda quando `database/` muda ou sob demanda: cenário de erros, medição em 4 estados e leitura do banco da medição pelo MCP.
 
 A rastreabilidade de cada critério de aceite até o teste está na [seção 10 da spec](docs/spec.md#10-rastreabilidade-critério--teste).
 
@@ -210,7 +210,11 @@ flowchart LR
 - uma leitura pelo `execute_sql` (os 1.500 pedidos da carga);
 - um `DELETE`, **recusado pelo próprio DBHub** ("Read-only"), com a contagem conferida direto no banco depois.
 
-**O que não foi possível nesta máquina:** usar o MCP interativamente numa sessão do Claude Code. Isso exige o banco rodando localmente, e não havia Docker. Por isso as evidências da Parte 4 vêm do `sqlcmd` rodando no CI. Com Docker, os passos acima ligam o MCP na sessão.
+**O MCP também leu o banco da Parte 4.** No workflow `parte4.yml`, depois da medição, o DBHub consultou o `PedidosPerf` com nomes de três partes. Ele usou o login `mcp_leitura` e estava conectado ao `PedidosDb` ([execução 43431232512](https://github.com/ppBernardo/pedidos-clientes/actions/runs/43431232512), no resumo da página).
+- `COUNT(*)` em `PedidosPerf.dbo.Pedidos`: 400.000.
+- O Query Store da medição trouxe as quatro queries, com média de 10.066, 10.066, 6.568 e 5.855 leituras lógicas. São os mesmos números do `STATISTICS IO` que o `sqlcmd` mediu na mesma execução: duas fontes independentes concordam.
+
+**O que não foi possível nesta máquina:** usar o MCP interativamente numa sessão do Claude Code. Isso exige o banco rodando localmente, e não havia Docker. As conversas com o DBHub acima foram feitas por um cliente MCP em script, no CI, e não pelo Claude. Com Docker, os passos acima ligam o MCP na sessão.
 
 ### O que funcionou bem
 
@@ -334,7 +338,7 @@ Roteiro da skill [`analisar-query`](.claude/skills/analisar-query/SKILL.md):
    Para cada estado ficam salvos `SET STATISTICS IO, TIME` e o **plano real** (`.sqlplan`). Os índices ficam num script separado (`03-indices.sql`) justamente para permitir essa comparação.
 4. **Onde rodou.** A máquina de desenvolvimento não tinha Docker, então a medição roda no workflow [`parte4.yml`](.github/workflows/parte4.yml), num runner do GitHub Actions. O workflow publica na página da execução a tabela abaixo e os operadores de cada plano real, e guarda os `.sqlplan` como artefato.
 
-**Resultado medido** ([execução 43335181912](https://github.com/ppBernardo/pedidos-clientes/actions/runs/43335181912), cache quente, 400 mil pedidos e 1,2 milhão de itens). As leituras lógicas são determinísticas; os tempos variam um pouco entre execuções.
+**Resultado medido** ([execução 43335181912](https://github.com/ppBernardo/pedidos-clientes/actions/runs/43335181912), cache quente, 400 mil pedidos e 1,2 milhão de itens). Os tempos variam um pouco entre execuções, e as leituras lógicas quase nada: a [reexecução 43431232512](https://github.com/ppBernardo/pedidos-clientes/actions/runs/43431232512) deu 2 páginas a mais no índice dos itens nos estados 3 e 4 (6.568 e 5.855). Nessa reexecução, o Query Store lido pelo MCP confirmou as mesmas leituras médias.
 
 | Estado | Leituras lógicas | CPU | Tempo | Acesso a `Pedidos` no plano real |
 |---|---|---|---|---|
