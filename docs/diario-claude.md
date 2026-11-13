@@ -67,7 +67,9 @@ Registro cronológico de como o Claude Code foi usado neste projeto: o que funci
 ## 2026-11-12: solução .NET, domínio e aplicação (M3 e M4)
 
 - **SDK sem admin.** O SDK 10 foi instalado por usuário com o script oficial `dotnet-install`. O hook de build foi corrigido para achar esse SDK quando o `dotnet` do PATH só tem o 8, e para forçar a saída do CLI em inglês. Neste Windows em português, as mensagens localizadas quebravam a detecção.
-- **Correções em código gerado pelo Claude**, cada uma em commit próprio:
+- **Correções em código gerado pelo Claude.**
+  - Só a 1ª tem commit `fix:` próprio (`5f72c2d`).
+  - As outras três foram pegas pelo hook ou pelos testes antes do commit, então o código entrou já corrigido. *(Texto corrigido na revisão final: antes dizia "cada uma em commit próprio".)*
   1. **Runner de testes.** O Claude configurou os projetos de teste para VSTest (`Microsoft.NET.Test.Sdk` + `xunit.runner.visualstudio`), por hábito. O xUnit v3 4.x roda no Microsoft.Testing.Platform, e o SDK 10 recusou. Correção: ativar o novo `dotnet test` no `global.json`. A regra foi registrada no CLAUDE.md para não se repetir.
   2. **`new(...)` com `params`.** Um `new(0, 1)` com tipo inferido como único argumento de um `params` não compila (CS8752). O **hook pegou o erro na hora**. Mesmo assim o Claude **repetiu o erro** no arquivo seguinte, e o hook pegou de novo. A correção definitiva foi trocar o `params` por *collection expression* (`[new(1, 1)]`).
   3. **Analisador do xUnit (xUnit1051).** Ele recusou `default` como `CancellationToken` nas verificações do NSubstitute. Trocado por `Arg.Any<CancellationToken>()`.
@@ -92,6 +94,7 @@ Registro cronológico de como o Claude Code foi usado neste projeto: o que funci
 ## 2026-11-12: endpoints com a skill e revisão com o subagente (M7, parte 2)
 
 - **`/novo-endpoint` usada de verdade** depois do reinício, três vezes: `GET /pedidos`, `GET /relatorios/top-clientes` e `GET /clientes` + `GET /produtos`. A skill tem o passo "a spec manda", então antes de cada endpoint o Claude conferiu a seção 5 e os CAs da spec. Os commits citam a skill.
+  - *Precisão acrescentada na revisão final:* nas três fatias, os contratos, validadores e portas já existiam, porque foram escritos com a camada de aplicação, antes da skill. Ela conduziu o que faltava: o endpoint e os testes do `GET /pedidos`, e consulta, endpoint e testes do relatório e do catálogo.
 - **Correção encontrada pelo roteiro da skill.** O smoke test previsto na verificação mostrou o OpenAPI com os parâmetros em PascalCase (`ClienteId`), diferente do contrato. O binding não diferencia maiúsculas, então só a documentação estava errada. A correção foi um transformer do OpenAPI na API, para não pôr atributos de ASP.NET na Application.
 - **Subagente `revisor` antes do push.** Ele revisou o histórico inteiro. **Dois pontos foram conferidos no código e descartados por serem falsos:**
   - "falta teste de integração do CA-04": o teste existe e cobre os dois corpos;
@@ -165,3 +168,12 @@ Um subagente auditou o repositório inteiro contra o enunciado, só com leitura.
 - **Subagente `revisor` antes do push desta rodada.** Ele liberou o push e apontou um problema real (`fix:`): a leitura do Query Store pelo MCP não conferia nada, e um erro do DBHub iria para o resumo como se fosse evidência.
   - A correção que ele sugeriu (`! grep -q '"isError":true'`) não funcionaria: com `set -e`, o bash ignora o código de saída de um comando negado com `!`.
   - O passo usa um `if` explícito.
+- **Testes.**
+  - Quatro testes citados na rastreabilidade da spec estavam sem `[Trait("CA")]`, e quatro referências da tabela não casavam com nenhum nome de teste. Um script agora cruza a tabela com os traits: 41 testes, nenhuma pendência.
+  - O 400 de validação ganhou asserção de `traceId`. Antes, a API foi rodada localmente para confirmar que ele já vinha.
+  - O teste unitário do CA-11 exercitava um helper do próprio teste e passou a testar a propriedade de produção.
+- **Afirmações sobre o processo, corrigidas no README, no plano e neste diário.** O `git log` desmentia três delas:
+  - "cada correção virou um commit `fix:` próprio": três correções do M4 nunca chegaram a commit, e o `8d2178b` saiu como `refactor:`;
+  - "cada commit compila": o `7a954ff` não compila, e a integração ficou vermelha em 28 commits;
+  - "a skill criou os quatro endpoints".
+- **Spec alinhada ao código (v1.1).** Validações de id, `PEDIDO_INVALIDO`, comportamento do modal e filtros mantidos depois de criar. O roteiro do CA-15 seguido à risca falharia, porque filtrava e depois esperava o pedido novo no topo.
