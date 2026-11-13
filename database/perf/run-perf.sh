@@ -40,7 +40,8 @@ medir() {
   echo ">> Medindo: $rotulo"
   sql -d "$DB" -i "$consulta" -o /dev/null
   sql -d "$DB" -v ARQUIVO="$consulta" -i "$PERF/medir.sql" -r1 1>/dev/null 2>"$SAIDA/$rotulo.txt"
-  sql -d "$DB" -v ARQUIVO="$consulta" -i "$PERF/plano.sql" -y 0 -h -1 \
+  # -y 0: XML do plano sem truncar (o sqlcmd não aceita -y 0 junto com -h).
+  sql -d "$DB" -v ARQUIVO="$consulta" -i "$PERF/plano.sql" -y 0 \
     | grep -o '<ShowPlanXML.*</ShowPlanXML>' > "$SAIDA/$rotulo.sqlplan"
 }
 
