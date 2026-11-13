@@ -43,6 +43,7 @@ public sealed class ListarPedidosTests(AmbienteDeTeste ambiente) : TesteDeIntegr
     }
 
     [Fact]
+    [Trait("CA", "CA-09")]
     [Trait("RN", "RN-13")]
     public async Task Get_PedidosNoMesmoInstante_DesempatamPeloIdDecrescente()
     {
@@ -73,6 +74,7 @@ public sealed class ListarPedidosTests(AmbienteDeTeste ambiente) : TesteDeIntegr
     }
 
     [Fact]
+    [Trait("CA", "CA-10")]
     [Trait("RN", "RN-12")]
     public async Task Get_ClienteSemPedidos_DevolveListaVaziaENaoErro()
     {
@@ -134,6 +136,7 @@ public sealed class ListarPedidosTests(AmbienteDeTeste ambiente) : TesteDeIntegr
     }
 
     [Fact]
+    [Trait("CA", "CA-12")]
     public async Task Get_ParametroQueNaoEhNumero_Retorna400ComProblemDetails()
     {
         var resposta = await Api.GetAsync("/pedidos?pagina=abc", Cancelamento);

@@ -271,16 +271,16 @@ Nos testes, cada critério também aparece como `[Trait("CA", "CA-xx")]`, e a bu
 | CA-01 | `PedidoTests.Criar_ComItensValidos_*`, `PedidoServiceTests.CriarAsync_PedidoValido_*` | `CriarPedidoTests.Post_PedidoValido_*`, `CriarPedidoTests.GetDoLocation_*` |
 | CA-02 | `PedidoServiceTests.CriarAsync_ClienteInexistente_*` | `CriarPedidoTests.Post_ClienteInexistente_*` |
 | CA-03 | `PedidoTests.Criar_ComEstoqueInsuficiente_*`, `PedidoServiceTests.CriarAsync_EstoqueInsuficienteNoSnapshot_*` | `CriarPedidoTests.Post_UmItemSemEstoque_*`, `CriarPedidoTests.Repositorio_QuandoABaixaDeUmItemFalha_*` |
-| CA-04 | `PedidoTests.Criar_SemItens_*`, `CriarPedidoValidatorTests.Validar_ItensAusentes_*` / `ItensVazios_*` | `CriarPedidoTests.Post_SemItens_*` |
+| CA-04 | `PedidoTests.Criar_SemItens_*`, `CriarPedidoValidatorTests.Validar_ItensAusentes_*` / `Validar_ItensVazios_*` | `CriarPedidoTests.Post_SemItens_*` |
 | CA-05 | `PedidoTests.Criar_ComQuantidadeMenorOuIgualAZero_*`, `CriarPedidoValidatorTests.Validar_QuantidadeInvalida_*` | `CriarPedidoTests.Post_QuantidadeZero_*` |
 | CA-06 | `PedidoTests.Criar_ComProdutoRepetido_*`, `CriarPedidoValidatorTests.Validar_ProdutoRepetido_*` | `CriarPedidoTests.Post_ProdutoRepetido_*` |
-| CA-07 | `PedidoTests.Criar_ComProdutosInexistentes_*` / `ComProdutoInativo_*`, `PedidoServiceTests.CriarAsync_ProdutoInexistente_*` | `CriarPedidoTests.Post_ProdutoInexistente_*` / `Post_ProdutoInativo_*` |
-| CA-08 | — | `ConcorrenciaTests.Post_VinteRequisicoesSimultaneas_*`, `ConcorrenciaTests.Post_PedidosSimultaneosComOsMesmosProdutosEmOrdemCruzada_*` |
+| CA-07 | `PedidoTests.Criar_ComProdutosInexistentes_*` / `Criar_ComProdutoInativo_*`, `PedidoServiceTests.CriarAsync_ProdutoInexistente_*` | `CriarPedidoTests.Post_ProdutoInexistente_*` / `Post_ProdutoInativo_*` |
+| CA-08 | — | `ConcorrenciaTests.Post_VinteRequisicoesSimultaneas*`, `ConcorrenciaTests.Post_PedidosSimultaneosComOsMesmosProdutosEmOrdemCruzada_*` |
 | CA-09 | — | `ListarPedidosTests.Get_SemFiltros_*`, `ListarPedidosTests.Get_PedidosNoMesmoInstante_*` |
 | CA-10 | — | `ListarPedidosTests.Get_FiltrandoPorCliente_*`, `ListarPedidosTests.Get_ClienteSemPedidos_*` |
 | CA-11 | `PeriodoTests.Contem_*` | `ListarPedidosTests.Get_FiltrandoPorPeriodo_*` |
 | CA-12 | `ListarPedidosValidatorTests.*` | `ListarPedidosTests.Get_ParametroInvalido_*`, `Get_PaginaAlemDaUltima_*`, `Get_ParametroQueNaoEhNumero_*` |
-| CA-13 | — | `TopClientesTests.Get_DevolveOsCincoMaiores_*`, `Get_ClientesHomonimos_*`, `Get_IgnoraPedidosForaDoPeriodo_*` |
+| CA-13 | — | `TopClientesTests.Get_DevolveOsCincoMaiores*`, `Get_ClientesHomonimos*`, `Get_IgnoraPedidosForaDoPeriodo*` |
 | CA-14 | `TopClientesValidatorTests.Validar_SemPeriodo_*` | `TopClientesTests.Get_PeriodoAusenteOuInvertido_*` |
 | CA-15 | — | Roteiro manual no README |
 | CA-16 | — | Job `compose` do CI (`.github/workflows/ci.yml`) |

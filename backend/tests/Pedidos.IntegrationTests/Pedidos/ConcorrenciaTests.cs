@@ -24,6 +24,7 @@ public sealed class ConcorrenciaTests(AmbienteDeTeste ambiente) : TesteDeIntegra
     }
 
     [Fact]
+    [Trait("CA", "CA-08")]
     [Trait("RN", "RN-09")]
     public async Task Post_PedidosSimultaneosComOsMesmosProdutosEmOrdemCruzada_NaoTemDeadlock()
     {
