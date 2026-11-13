@@ -53,10 +53,14 @@ MSYS_NO_PATHCONV=1 docker compose exec -T sqlserver /opt/mssql-tools18/bin/sqlcm
 - Predicados *sargable*: intervalo semiaberto, sem função sobre coluna indexada.
 - Agregue pela chave e só depois junte as descrições (pré-agregação).
 - Use desempate determinístico.
-- Compare os estados:
-  - **A**: original sem índices;
-  - **B**: original com índices;
-  - **C**: corrigida com índices.
+- Compare 4 estados, separando o efeito da reescrita do efeito dos índices:
+  1. original sem índices;
+  2. corrigida sem índices;
+  3. original com índices;
+  4. corrigida com índices.
 
   Compare o resultado (explicando cada diferença) e o custo (leituras, CPU, tempo e operadores do plano).
+  - Na Parte 4, o estado 2 mostrou que a reescrita sozinha **não muda** as leituras: sargabilidade só ajuda quando há índice para buscar.
+- **Desconfie das próprias premissas.** "O otimizador converte esse LEFT JOIN em INNER" parecia certo e o plano real mostrou o contrário. Confirme no plano antes de escrever.
 - Registre no README (seção da Parte 4) **só números medidos**, nunca estimados de cabeça.
+- Sem Docker local, rode a medição no workflow `parte4.yml`, que publica o resumo na página da execução.
