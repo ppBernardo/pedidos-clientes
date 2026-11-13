@@ -102,3 +102,17 @@ Registro cronológico de como o Claude Code foi usado neste projeto: o que funci
   - senhas dos logins passadas ao `sqlcmd` por variável de ambiente, e não por `-v`. O comentário do script prometia isso, mas o código não cumpria.
 
   A sugestão de voltar para `CollectionBehavior(DisableTestParallelization)` foi recusada: ela não compila no xUnit 4. Lição: o relatório de um agente é uma hipótese, não prova. Cada item foi verificado antes de virar código.
+
+## 2026-11-12: publicação e primeira execução real no CI
+
+- **Publicação.** O GitHub mostrou o roteiro de "quick setup" para repositório novo (`git init`, commit "first commit", `echo ... >> README.md`). O Claude **não** o executou, porque o repositório já tinha histórico: fez só o `git push -u origin main` dos 74 commits.
+- **Os logs do CI exigem login**, mesmo em repositório público. A API respondeu 403 e as anotações só traziam "exit code 2". O Claude leu o log do job pelo Chrome do usuário, que já estava logado.
+- **1ª execução: 37 de 42 testes de integração falharam, todos pelo mesmo motivo.**
+  - Um teste adiantava o `FakeTimeProvider` para 31/12/2026, e a base dos testes tentava voltar o relógio no teste seguinte, o que ele proíbe ("Cannot go back in time").
+  - Era um defeito do código de teste gerado, e só apareceu na execução real.
+  - Correção: um `TimeProvider` mínimo e ajustável (`RelogioDeTeste`).
+  - O resto da infraestrutura funcionou de primeira: Testcontainers, cópia de `database/` para o container e o `init-db.sh`.
+- **2ª execução: tudo verde.**
+  - Hooks, frontend, build com warnings como erro e testes unitários.
+  - **42 de 42 testes de integração** contra SQL Server real (33 s), incluindo os 20 pedidos simultâneos para estoque 5, a ordem cruzada sem deadlock e as permissões dos logins.
+  - **Smoke test do `docker compose up --build`** numa máquina limpa, sem `.env`: subiu em 1 min. O fluxo pelo proxy do frontend passou: 1.500 pedidos, POST no topo da listagem, ranking com 5 clientes e 422 sem estoque.
