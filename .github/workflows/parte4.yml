@@ -35,22 +35,46 @@ jobs:
           mkdir -p docs/parte4
           docker compose run --rm --user root -v "$PWD/docs/parte4:/saida" --entrypoint bash db-init /database/perf/run-perf.sh
 
-      - name: Operadores dos planos reais
+      # Resumo em Markdown na página da execução (o log da interface trunca
+      # saídas longas): leituras lógicas, tempos e os operadores de cada plano.
+      - name: Resumo da medição e dos planos reais
         run: |
           python3 - <<'PY'
-          import glob
+          import glob, os, re
           import xml.etree.ElementTree as ET
 
           ns = {"p": "http://schemas.microsoft.com/sqlserver/2004/07/showplan"}
-          for arquivo in sorted(glob.glob("docs/parte4/*.sqlplan")):
-              print(f"== {arquivo}")
-              for op in ET.parse(arquivo).getroot().iter(f"{{{ns['p']}}}RelOp"):
+          linhas = ["## Parte 4: medição em cache quente", "",
+                    "| Estado | Leituras lógicas por tabela | CPU | Tempo |", "|---|---|---|---|"]
+          for arquivo in sorted(glob.glob("docs/parte4/[1-4]-*.txt")):
+              texto = open(arquivo, encoding="utf-8", errors="replace").read()
+              leituras = [(t, int(r)) for t, r in re.findall(r"Table '(\w+)'\. Scan count \d+, logical reads (\d+)", texto)
+                          if t != "Worktable"]
+              cpu, tempo = (re.findall(r"CPU time = (\d+) ms,\s+elapsed time = (\d+) ms", texto) or [("?", "?")])[-1]
+              detalhe = ", ".join(f"{t} {r}" for t, r in leituras)
+              total = sum(r for _, r in leituras)
+              linhas.append(f"| {os.path.basename(arquivo)[:-4]} | {detalhe} (**total {total}**) | {cpu} ms | {tempo} ms |")
+
+          linhas += ["", "### Operadores dos planos reais (sem Compute Scalar, Segment e Parallelism)", ""]
+          ignorados = {"Compute Scalar", "Segment", "Sequence Project", "Parallelism"}
+          for plano in sorted(glob.glob("docs/parte4/*.sqlplan")):
+              linhas.append(f"**{os.path.basename(plano)}**")
+              linhas.append("")
+              for op in ET.parse(plano).getroot().iter(f"{{{ns['p']}}}RelOp"):
+                  if op.get("PhysicalOp") in ignorados:
+                      continue
                   objeto = op.find("./*/p:Object", ns)
-                  nome = f" {objeto.get('Table')}.{objeto.get('Index')}" if objeto is not None else ""
-                  contadores = op.findall("p:RunTimeInformation/p:RunTimeCountersPerThread", ns)
-                  reais = sum(int(c.get("ActualRows", 0)) for c in contadores)
-                  print(f"  {op.get('PhysicalOp')} ({op.get('LogicalOp')}){nome}"
-                        f" | estimadas={float(op.get('EstimateRows')):.0f} reais={reais}")
+                  nome = f" `{objeto.get('Table')}.{objeto.get('Index')}`" if objeto is not None else ""
+                  reais = sum(int(c.get("ActualRows", 0))
+                              for c in op.findall("p:RunTimeInformation/p:RunTimeCountersPerThread", ns))
+                  linhas.append(f"- {op.get('PhysicalOp')} ({op.get('LogicalOp')}){nome}: "
+                                f"estimadas {float(op.get('EstimateRows')):.0f}, reais {reais}")
+              linhas.append("")
+
+          relatorio = "\n".join(linhas)
+          print(relatorio)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as saida:
+              saida.write(relatorio + "\n")
           PY
 
       - uses: actions/upload-artifact@v7
